@@ -6,3 +6,6 @@ spikes/*/photos/
 spikes/*/results/
 *.heic
 *.HEIC
+
+# Private, device-specific project notes (Pi address, SSH user, Wi-Fi)
+CLAUDE.local.md
