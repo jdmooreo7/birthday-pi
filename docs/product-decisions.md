@@ -15,3 +15,4 @@ Decisions made by the Product Owner, newest last. The storyboard (`birthday_pi_s
 | 2026-10-13 | Photo-first onboarding with on-device face recognition is in v1 (`features/photo-first-onboarding.md`). |
 | 2026-10-13 | A person is confirmed from at least 3 photos. The Pi never auto-identifies anyone with fewer than 3 verified photos; until then it asks. |
 | 2026-10-13 | Tagging "who's in this photo" by hand is an acceptable fallback when face recognition misses or is wrong. Hand-tagged faces count as verified. |
+| 2026-10-13 | Pets detected as faces are handled with a "Not a person" button on the "Who is this?" card, plus the 3-photo rule. No automatic pet filter in v1. Pets with birthdays are a future idea (`features/pets-as-family.md`). |

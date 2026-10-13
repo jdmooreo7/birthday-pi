@@ -85,11 +85,13 @@ Faces are grouped by person, and the largest groups are asked about first. A car
 │                         │
 │ Not all the same person?│
 │ Not family · Skip       │
+│ Not a person (pet etc.) │
 └─────────────────────────┘
 ```
 
 - Typing suggests people already named, so the same person found in two groups gets merged instead of duplicated.
 - **Not family** ignores that face group from then on (waiters, strangers in the background).
+- **Not a person** ignores a group that isn't a human face at all, such as a pet. The face detector can't reliably tell pets from people: in the 2026-10-13 test a dog scored 0.86–0.87 face confidence, higher than 6 of 37 human faces, so no cut-off can filter it out. The 3-photo rule stops most pets being asked about; this button handles the rest. (Pets with birthdays are a future idea: `pets-as-family.md`.)
 - **Skip** comes back to it later.
 
 ### 4. New person → ask their dates there and then
