@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Birthday Pi kiosk
+Comment=Show the Birthday Pi screen full-screen on the monitor
+Exec=/home/winston/birthday-pi/kiosk/kiosk.sh
+X-GNOME-Autostart-enabled=true

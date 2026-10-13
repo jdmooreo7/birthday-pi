@@ -1,0 +1,8 @@
+# macOS
+.DS_Store
+
+# Real family photos and face data never go in git.
+spikes/*/photos/
+spikes/*/results/
+*.heic
+*.HEIC
