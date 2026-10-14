@@ -59,6 +59,8 @@ def save_upload(conn: sqlite3.Connection, data: bytes, uploader_id: int, approve
     try:
         img = Image.open(io.BytesIO(data))
         taken = _taken_at(img)
+        # JPEGs decode straight at a reduced scale (still at least screen size): far less memory on the Pi.
+        img.draft("RGB", SCREEN_BOX)
         img = ImageOps.exif_transpose(img).convert("RGB")
     except (OSError, ValueError, Image.DecompressionBombError):
         raise UploadError("isn't a photo Birthday Pi can read")
