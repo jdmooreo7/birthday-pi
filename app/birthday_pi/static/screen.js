@@ -1,4 +1,5 @@
-// Monitor behaviour: live clock, refresh from the Pi every 10 s, night dim while idle.
+// Monitor behaviour: live clock, refresh from the Pi every 10 s, night dim while idle,
+// and a new reminder wakes the screen. The date comes from the Pi (it may be a pretend date).
 // URL params override timings for testing, e.g. /screen?idle=10&night=0-24
 (function () {
   const params = new URLSearchParams(location.search);
@@ -21,12 +22,16 @@
     const now = new Date();
     const idle = Date.now() - lastActive;
     const clock = document.getElementById("clock");
-    const date = document.getElementById("date");
     if (clock) clock.textContent = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-    if (date) date.textContent = now.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
     document.body.classList.toggle("idle-cursor", idle >= CURSOR_MS);
     document.body.classList.toggle("night", idle >= IDLE_MS && isNight(now));
   }
+
+  function reminderKeys() {
+    const el = document.querySelector("[data-reminders]");
+    return new Set(el && el.dataset.reminders ? el.dataset.reminders.split(" ") : []);
+  }
+  let seenReminders = reminderKeys();
 
   async function refresh() {
     try {
@@ -37,7 +42,10 @@
       if (content.dataset.html !== html) {
         content.innerHTML = html;
         content.dataset.html = html;
-        tick();
+        const keys = reminderKeys();
+        const isNew = [...keys].some(k => !seenReminders.has(k));
+        seenReminders = keys;
+        if (isNew) wake(); else tick();
       }
     } catch (e) { /* keep showing the last known screen */ }
   }

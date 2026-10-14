@@ -18,12 +18,37 @@
   </div>
   <div class="footnote">Names, dates and photos stay on this Pi. Nothing goes to the internet.</div>
 </div>
+{% elif reminders %}
+<div class="reminders" data-reminders="{{ reminder_keys }}">
+  <div class="topline">
+    <div class="small-date">{{ today.strftime("%A, %B") }} {{ today.day }}{% if pretend %} <span class="pretend">testing</span>{% endif %}</div>
+    <div id="clock" class="small-clock">{{ now.strftime("%-I:%M") }}</div>
+  </div>
+  {% for r, px in reminders %}
+  <div class="rcard{% if reminders | length == 1 %} single{% endif %}">
+    <div class="rtext">
+      <div class="rlabel">{{ r.label }}</div>
+      <div class="rhead" style="font-size: {{ (px / 10.8) | round(2) }}vh">{{ r.headline }}</div>
+      <div class="rsub">{{ r.sub }}</div>
+    </div>
+    <form method="post" action="/reminders/ack">
+      <input type="hidden" name="key" value="{{ r.key }}">
+      <input type="hidden" name="back" value="/screen">
+      <button type="submit">Got it</button>
+    </form>
+  </div>
+  {% endfor %}
+  {% if more_reminders %}<div class="more">+ {{ more_reminders }} more on your phone</div>
+  {% elif reminders | length == 1 and next_up %}
+  <div class="next"><b>Next:</b> {% for c in next_up %}{{ c.name }} · {{ short_date(c.when) }}{% if not loop.last %} &nbsp;·&nbsp; {% endif %}{% endfor %}</div>
+  {% endif %}
+</div>
 {% else %}
-<div class="home">
+<div class="home" data-reminders="">
   <div class="home-main">
     <div class="clock-col">
       <div id="clock">{{ now.strftime("%-I:%M") }}</div>
-      <div id="date">{{ today.strftime("%A, %B") }} {{ today.day }}</div>
+      <div id="date">{{ today.strftime("%A, %B") }} {{ today.day }}{% if pretend %} <span class="pretend">testing</span>{% endif %}</div>
     </div>
     <div class="coming">
       <h2>Coming up</h2>

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Pretend today is{% endblock %}
+{% block content %}
+<div>
+  <h1>Pretend today is…</h1>
+  <p class="muted">For testing reminders without waiting. The real date is {{ real.strftime("%A, %B") }} {{ real.day }}. Everyone sees a banner while this is on.</p>
+</div>
+<form method="post" action="/settings/date" novalidate>
+  <div class="field{% if error %} has-error{% endif %}">
+    <label for="date">Date</label>
+    <input id="date" name="date" type="date" value="{{ current.isoformat() }}">
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+  </div>
+  <button class="btn" type="submit" name="action" value="pretend">Pretend it's this date</button>
+  <button class="btn secondary" type="submit" name="action" value="real">Use the real date</button>
+</form>
+<a class="btn quiet" href="/">Back</a>
+{% endblock %}

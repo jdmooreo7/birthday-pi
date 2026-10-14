@@ -26,6 +26,12 @@ CREATE TABLE IF NOT EXISTS anniversaries (
     day       INTEGER NOT NULL,
     year      INTEGER
 );
+-- "Got it" on a reminder; key is "<p|a><id>:<stage>:<celebration date>".
+CREATE TABLE IF NOT EXISTS reminder_acks (
+    key       TEXT PRIMARY KEY,
+    person_id INTEGER REFERENCES people(id) ON DELETE SET NULL,
+    acked_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 -- A phone or tablet that picked "who's using this". Only a hash of its cookie is stored.
 CREATE TABLE IF NOT EXISTS devices (
     token_hash    TEXT PRIMARY KEY,

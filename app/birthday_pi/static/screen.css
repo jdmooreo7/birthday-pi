@@ -39,3 +39,28 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); o
 #night { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity 3s ease; }
 body.night #night { opacity: 0.85; }
 body.idle-cursor { cursor: none; }
+/* Reminders (mockups "One reminder" and "Three reminders"). */
+.reminders { height: 100%; box-sizing: border-box; padding: 4.4vh 5vw; display: flex; flex-direction: column; gap: 2.6vh; }
+.topline { display: flex; justify-content: space-between; align-items: baseline; }
+.small-date { font-size: 4.1vh; color: var(--muted); }
+.reminders #clock { font-size: 5.2vh; font-variant-numeric: tabular-nums; }
+.rcard { flex: 1 1 0; min-height: 0; box-sizing: border-box; padding: 3vh 3.6vw; background: var(--accent); color: var(--bg);
+  border-radius: 3vh; display: flex; align-items: center; justify-content: space-between; gap: 2.5vw; }
+.rtext { display: flex; flex-direction: column; gap: 0.8vh; min-width: 0; }
+.rlabel { font-size: 3.2vh; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.rhead { font-weight: 700; line-height: 1.05; }
+.rsub { font-size: 3.4vh; }
+.rcard form { margin: 0; flex-shrink: 0; }
+.rcard button { font: inherit; font-size: 4.4vh; font-weight: 700; min-width: 15vw; min-height: 10.4vh; padding: 1.8vh 3vw;
+  border: 0; border-radius: 999px; background: var(--bg); color: var(--fg); cursor: pointer; }
+.more, .next { font-size: 3.3vh; color: var(--muted); }
+.next b { color: var(--fg); }
+.pretend { font-size: 0.6em; background: var(--fg); color: var(--bg); border-radius: 0.6em; padding: 0.1em 0.5em; vertical-align: middle; }
+/* A single reminder fills the screen: label at the top, headline, then date and button along the bottom. */
+.rcard.single { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto 1fr auto;
+  align-items: end; padding: 5.9vh 4.2vw; }
+.rcard.single .rtext { display: contents; }
+.rcard.single .rlabel { grid-column: 1 / -1; align-self: start; font-size: 4.4vh; }
+.rcard.single .rhead { grid-column: 1 / -1; align-self: center; }
+.rcard.single .rsub { grid-column: 1; grid-row: 3; font-size: 4.8vh; align-self: end; }
+.rcard.single form { grid-column: 2; grid-row: 3; }

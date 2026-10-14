@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Birthday Pi</title>
-<link rel="stylesheet" href="/static/fonts.css">
-<link rel="stylesheet" href="/static/screen.css">
+<link rel="stylesheet" href="{{ static_url('fonts.css') }}">
+<link rel="stylesheet" href="{{ static_url('screen.css') }}">
 </head>
 <body>
 <div id="content">{% include "_screen_content.html" %}</div>
 <div id="night"></div>
-<script src="/static/screen.js"></script>
+<script src="{{ static_url('screen.js') }}"></script>
 </body>
 </html>

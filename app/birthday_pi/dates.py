@@ -51,8 +51,11 @@ class Celebration:
     name: str
     when: date
     days_away: int
-    detail: str
+    detail: str  # e.g. "Birthday · turns 7"
     initial: str
+    source: str = ""  # "p<id>" for a birthday, "a<id>" for an anniversary
+    event: str = ""  # e.g. "birthday", "wedding anniversary", "graduation"
+    extra: str = ""  # e.g. "turns 7", "12 years"
 
 
 def upcoming(conn: sqlite3.Connection, today: date, within_days: int | None = None,
@@ -61,23 +64,29 @@ def upcoming(conn: sqlite3.Connection, today: date, within_days: int | None = No
     items: list[Celebration] = []
     for p in conn.execute("SELECT * FROM people WHERE birth_month IS NOT NULL"):
         when = next_occurrence(p["birth_month"], p["birth_day"], today)
-        detail = "Birthday"
+        extra = ""
         if p["birth_year"] and when.year > p["birth_year"]:
-            detail = f"Birthday · turns {when.year - p['birth_year']}"
-        items.append(Celebration("birthday", p["name"], when, (when - today).days, detail, p["name"][:1].upper()))
+            extra = f"turns {when.year - p['birth_year']}"
+        detail = f"Birthday · {extra}" if extra else "Birthday"
+        items.append(Celebration("birthday", p["name"], when, (when - today).days, detail, p["name"][:1].upper(),
+                                 f"p{p['id']}", "birthday", extra))
     rows = conn.execute("SELECT a.*, p.name FROM anniversaries a JOIN people p ON p.id = a.person_id")
     for a in rows:
         when = next_occurrence(a["month"], a["day"], today)
         if a["year"] and when.year < a["year"]:
             when = occurrence(a["month"], a["day"], a["year"])  # a future date: nothing to celebrate before it
         label = ANNIVERSARY_TYPES.get(a["kind"], a["kind"].title())
-        detail = f"{label} anniversary"
+        event, extra = f"{label.lower()} anniversary", ""
         if a["year"] and when.year == a["year"]:
-            detail = f"{label} day"
+            event = label.lower()  # the day itself, e.g. "graduation"
         elif a["year"]:
             n = when.year - a["year"]
-            detail += f" · {n} year{'s' if n != 1 else ''}"
-        items.append(Celebration("anniversary", a["name"], when, (when - today).days, detail, a["name"][:1].upper()))
+            extra = f"{n} year{'s' if n != 1 else ''}"
+        detail = event[:1].upper() + event[1:] + (" day" if event == label.lower() else "")
+        if extra:
+            detail += f" · {extra}"
+        items.append(Celebration("anniversary", a["name"], when, (when - today).days, detail, a["name"][:1].upper(),
+                                 f"a{a['id']}", event, extra))
     if within_days is not None:
         items = [c for c in items if c.days_away <= within_days]
     items.sort(key=lambda c: (c.when, c.name))

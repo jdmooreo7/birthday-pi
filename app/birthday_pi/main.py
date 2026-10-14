@@ -1,4 +1,5 @@
 """Birthday Pi web app: the monitor screen (/screen) and the phone pages (everything else)."""
+import hashlib
 import os
 import sqlite3
 from datetime import date, datetime
@@ -10,7 +11,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import db, devices, pins
+from . import db, devices, pins, reminders
 from .dates import ANNIVERSARY_TYPES, MONTHS, how_far, missing_birthdays, short_date, upcoming, valid_month_day
 
 HERE = Path(__file__).parent
@@ -20,7 +21,15 @@ PUBLIC_URL = os.environ.get("BIRTHDAY_PI_URL", "http://birthdaypi.local:8080").r
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 templates = Jinja2Templates(directory=HERE / "templates")
-templates.env.globals.update(MONTHS=MONTHS, how_far=how_far, short_date=short_date)
+
+
+def static_url(name: str) -> str:
+    """A /static link with a content hash, so browsers (and the kiosk) pick up new versions."""
+    digest = hashlib.sha256((HERE / "static" / name).read_bytes()).hexdigest()[:10]
+    return f"/static/{name}?v={digest}"
+
+
+templates.env.globals.update(MONTHS=MONTHS, how_far=how_far, short_date=short_date, static_url=static_url)
 
 
 class RedirectTo(Exception):
@@ -41,7 +50,12 @@ def get_conn():
         conn.close()
 
 
-def today() -> date:
+def today(conn: sqlite3.Connection | None = None) -> date:
+    """The real date, or the "pretend today is" date set for testing."""
+    if conn is not None:
+        pretend = db.get_setting(conn, "pretend_date")
+        if pretend:
+            return date.fromisoformat(pretend)
     return date.today()
 
 
@@ -59,6 +73,12 @@ def require_device(conn: sqlite3.Connection, request: Request) -> sqlite3.Row:
 
 
 def page(request: Request, name: str, status_code: int = 200, **context) -> HTMLResponse:
+    if "pretend" not in context:
+        conn = db.connect()
+        try:
+            context["pretend"] = db.get_setting(conn, "pretend_date") and today(conn)
+        finally:
+            conn.close()
     return templates.TemplateResponse(request, name, context, status_code=status_code)
 
 
@@ -161,10 +181,57 @@ async def pin_check(request: Request, conn: sqlite3.Connection = Depends(get_con
 def home(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
     device = require_device(conn, request)
     people_count = conn.execute("SELECT COUNT(*) FROM people").fetchone()[0]
+    now = today(conn)
     return page(
-        request, "home.html", device=device, today=today(),
-        upcoming=upcoming(conn, today(), within_days=COMING_UP_DAYS), missing=missing_birthdays(conn), people_count=people_count,
+        request, "home.html", device=device, today=now, reminders=reminders.active(conn, now),
+        upcoming=upcoming(conn, now, within_days=COMING_UP_DAYS), missing=missing_birthdays(conn),
+        people_count=people_count, trusted_owner=devices.is_trusted_owner(device),
     )
+
+
+# ---------- Reminders ----------
+
+@app.post("/reminders/ack")
+async def reminder_ack(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    """ "Got it" from a phone or the monitor. No PIN needed."""
+    form = await request.form()
+    key = str(form.get("key", ""))
+    if key in {r.key for r in reminders.active(conn, today(conn))}:
+        device = devices.current(conn, request)
+        reminders.acknowledge(conn, key, device["person_id"] if device else None)
+    back = "/screen" if form.get("back") == "/screen" else "/"
+    return RedirectResponse(back, status_code=303)
+
+
+# ---------- Testing: "pretend today is" ----------
+
+def require_trusted_owner(conn: sqlite3.Connection, request: Request) -> sqlite3.Row:
+    device = require_device(conn, request)
+    if not devices.is_trusted_owner(device):
+        raise RedirectTo("/pin")
+    return device
+
+
+@app.get("/settings/date")
+def pretend_form(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    device = require_trusted_owner(conn, request)
+    return page(request, "pretend_date.html", device=device, real=date.today(), current=today(conn), error=None)
+
+
+@app.post("/settings/date")
+async def pretend_save(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    device = require_trusted_owner(conn, request)
+    form = await request.form()
+    if form.get("action") == "real":
+        conn.execute("DELETE FROM settings WHERE key = 'pretend_date'")
+        return RedirectResponse("/", status_code=303)
+    try:
+        chosen = date.fromisoformat(str(form.get("date", "")))
+    except ValueError:
+        return page(request, "pretend_date.html", 400, device=device, real=date.today(), current=today(conn),
+                    error="Please pick a date.")
+    db.set_setting(conn, "pretend_date", chosen.isoformat())
+    return RedirectResponse("/", status_code=303)
 
 
 def _people_list(conn: sqlite3.Connection) -> list[dict]:
@@ -356,9 +423,16 @@ def _screen_context(conn: sqlite3.Connection) -> dict:
         qr = segno.make(PUBLIC_URL + "/setup", error="m")
         svg = qr.svg_inline(scale=10, border=2, dark="#1d1b2f", light="#fdf6ec")
         return {"mode": "welcome", "qr_svg": svg, "setup_url": PUBLIC_URL.split("://", 1)[-1] + "/setup"}
-    return {"mode": "home", "today": today(), "upcoming": upcoming(conn, today(), within_days=COMING_UP_DAYS, limit=4),
+    now = today(conn)
+    active = reminders.active(conn, now)
+    shown = list(zip(active, reminders.monitor_sizes(active)))
+    return {"mode": "home", "today": now, "upcoming": upcoming(conn, now, within_days=COMING_UP_DAYS, limit=4),
             "missing_count": len(missing_birthdays(conn)), "now": datetime.now(),
-            "phone_url": PUBLIC_URL.split("://", 1)[-1]}
+            "phone_url": PUBLIC_URL.split("://", 1)[-1], "reminders": shown,
+            "more_reminders": len(active) - len(shown), "reminder_keys": " ".join(r.key for r in active),
+            # With one reminder showing, "Next:" lists what comes after it.
+            "next_up": [c for c in upcoming(conn, now, within_days=COMING_UP_DAYS)
+                        if active and c.when > active[0].when][:3]}
 
 
 @app.get("/screen")

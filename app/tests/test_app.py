@@ -71,7 +71,7 @@ def test_add_person_with_birthday_and_typed_anniversaries(set_up):
 def test_coming_up_only_shows_next_60_days(set_up, monkeypatch):
     from datetime import date
     from birthday_pi import main
-    monkeypatch.setattr(main, "today", lambda: date(2026, 10, 14))
+    monkeypatch.setattr(main, "today", lambda *a: date(2026, 10, 14))
     client = set_up
     client.post("/people/new", data={"name": "Soon", "birth_month": "12", "birth_day": "13"})  # 60 days
     client.post("/people/new", data={"name": "Later", "birth_month": "12", "birth_day": "14"})  # 61 days
@@ -121,7 +121,7 @@ def test_remove_person_but_never_grandma(set_up):
 
 def test_monitor_home_lists_coming_up(set_up):
     client = set_up
-    soon = date.today() + timedelta(days=5)
+    soon = date.today() + timedelta(days=30)  # past the reminder window
     client.post("/people/new", data={"name": "Mia", "birth_month": str(soon.month), "birth_day": str(soon.day)})
     screen = client.get("/screen/content").text
     assert "Coming up" in screen and "Mia" in screen
@@ -149,7 +149,7 @@ def test_load_sample_only_on_fresh_pi(client, capsys):
 
 def test_anniversary_can_be_in_the_future(set_up, monkeypatch):
     from birthday_pi import main
-    monkeypatch.setattr(main, "today", lambda: date(2026, 10, 14))
+    monkeypatch.setattr(main, "today", lambda *a: date(2026, 10, 14))
     client = set_up
     r = client.post("/people/new", data={"name": "Leo", "ann_count": "1", "ann_0_kind": "graduation",
                                          "ann_0_month": "6", "ann_0_day": "1", "ann_0_year": "2028"},
@@ -169,3 +169,30 @@ def test_future_anniversary_first_shows_on_the_day(tmp_path, monkeypatch):
     c = upcoming(conn, date(2028, 5, 20))[0]
     assert c.when == date(2028, 6, 1) and c.detail == "Graduation day"
     assert upcoming(conn, date(2029, 5, 20))[0].detail == "Graduation anniversary · 1 year"
+
+
+def test_got_it_on_monitor_clears_phone_too(set_up):
+    client = set_up
+    soon = date.today() + timedelta(days=3)
+    client.post("/people/new", data={"name": "Leo", "birth_month": str(soon.month), "birth_day": str(soon.day)})
+    screen = client.get("/screen/content").text
+    assert "Leo&#39;s birthday is in 3 days" in screen and 'data-reminders="p' in screen
+    assert "Leo&#39;s birthday is in 3 days" in client.get("/").text
+    key = screen.split('name="key" value="')[1].split('"')[0]
+    r = client.post("/reminders/ack", data={"key": key, "back": "/screen"}, follow_redirects=False)
+    assert r.headers["location"] == "/screen"
+    assert "Got it" not in client.get("/").text
+    assert "Got it" not in client.get("/screen/content").text
+
+
+def test_pretend_date_needs_grandma_and_shows_banner(client):
+    client.post("/setup", data={"owner_name": "Grandma", "pin": "2468", "pin2": "2468"})
+    client.post("/who", data={"new_name": "Dana"})
+    assert client.get("/settings/date", follow_redirects=False).headers["location"] == "/pin"
+    client.post("/pin", data={"pin": "2468"})
+    later = date.today() + timedelta(days=200)
+    client.post("/settings/date", data={"date": later.isoformat(), "action": "pretend"})
+    assert "Testing: pretending today is" in client.get("/").text
+    assert "testing" in client.get("/screen/content").text
+    client.post("/settings/date", data={"action": "real"})
+    assert "Testing: pretending" not in client.get("/").text

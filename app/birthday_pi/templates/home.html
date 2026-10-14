@@ -1,6 +1,17 @@
 {% extends "base.html" %}
 {% block content %}
 <p class="muted">{{ today.strftime("%A, %B") }} {{ today.day }}</p>
+{% for r in reminders %}
+<div class="card warm reminder">
+  <div class="label">{{ r.label }}</div>
+  <div class="headline" style="font-size: {{ (20 + r.size_px * 0.09) | round | int }}px">{{ r.headline }}</div>
+  <form method="post" action="/reminders/ack" class="ack">
+    <span>{{ r.sub }}</span>
+    <input type="hidden" name="key" value="{{ r.key }}">
+    <button class="btn dark" type="submit">Got it</button>
+  </form>
+</div>
+{% endfor %}
 {% if people_count <= 1 %}
 <div class="card warm">
   <h2>Let's add the family</h2>
@@ -31,4 +42,5 @@
   <p class="muted">Nothing in the next 60 days.{% if people_count <= 1 %} Add someone's birthday and it shows up here.{% endif %}</p>
   {% endfor %}
 </section>
+{% if trusted_owner %}<a class="btn quiet" href="/settings/date">Testing: pretend today is…</a>{% endif %}
 {% endblock %}

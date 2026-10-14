@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}Birthday Pi{% endblock %}</title>
-<link rel="stylesheet" href="/static/fonts.css">
-<link rel="stylesheet" href="/static/phone.css">
+<link rel="stylesheet" href="{{ static_url('fonts.css') }}">
+<link rel="stylesheet" href="{{ static_url('phone.css') }}">
 </head>
 <body>
 <main>
@@ -13,6 +13,7 @@
     <a class="brand" href="/">Birthday Pi</a>
     {% if device %}<div class="who">{{ device.name }} · <a href="/who">Not you?</a></div>{% endif %}
   </div>
+  {% if pretend %}<div class="pretend" role="status">Testing: pretending today is {{ pretend.strftime("%A, %B") }} {{ pretend.day }}</div>{% endif %}
   {% block content %}{% endblock %}
 </main>
 </body>
