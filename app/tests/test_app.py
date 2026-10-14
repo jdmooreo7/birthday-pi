@@ -191,13 +191,26 @@ def test_pretend_date_needs_grandma_and_shows_banner(client):
     assert client.get("/settings/date", follow_redirects=False).headers["location"] == "/pin"
     client.post("/pin", data={"pin": "2468"})
     later = date.today() + timedelta(days=200)
-    client.post("/settings/date", data={"date": later.isoformat(), "action": "pretend"})
+    client.post("/settings/date", data={"date": later.isoformat(), "idle": "300", "action": "save"})
     assert "Testing: pretending today is" in client.get("/").text
     assert "testing" in client.get("/screen/content").text
-    client.post("/settings/date", data={"action": "real"})
+    client.post("/settings/date", data={"action": "normal"})
     assert "Testing: pretending" not in client.get("/").text
 
 
 def test_screen_reports_its_build_so_it_can_reload(client):
     build = client.get("/screen/content").headers["X-Screen-Build"]
     assert f'data-build="{build}"' in client.get("/screen").text
+
+
+def test_testing_wait_before_photos(set_up):
+    client = set_up
+    assert client.get("/screen/content").headers["X-Screen-Idle"] == "300"
+    client.post("/settings/date", data={"date": date.today().isoformat(), "idle": "10", "action": "save"})
+    assert client.get("/screen/content").headers["X-Screen-Idle"] == "10"
+    assert 'data-idle="10"' in client.get("/screen").text
+    assert "photos after 10 seconds" in client.get("/").text
+    assert "pretending" not in client.get("/").text  # real date kept
+    client.post("/settings/date", data={"action": "normal"})
+    assert client.get("/screen/content").headers["X-Screen-Idle"] == "300"
+    assert 'role="status">Testing' not in client.get("/").text  # banner gone

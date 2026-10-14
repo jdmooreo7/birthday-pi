@@ -80,6 +80,8 @@ def page(request: Request, name: str, status_code: int = 200, **context) -> HTML
         conn = db.connect()
         try:
             context["pretend"] = db.get_setting(conn, "pretend_date") and today(conn)
+            idle = idle_seconds(conn)
+            context["test_idle"] = IDLE_CHOICES[idle] if idle != NORMAL_IDLE else None
         finally:
             conn.close()
     return templates.TemplateResponse(request, name, context, status_code=status_code)
@@ -209,7 +211,7 @@ async def reminder_ack(request: Request, conn: sqlite3.Connection = Depends(get_
     return RedirectResponse(back, status_code=303)
 
 
-# ---------- Testing: "pretend today is" ----------
+# ---------- Testing: "pretend today is" and a shorter wait before photos ----------
 
 def require_trusted_owner(conn: sqlite3.Connection, request: Request) -> sqlite3.Row:
     device = require_device(conn, request)
@@ -218,25 +220,48 @@ def require_trusted_owner(conn: sqlite3.Connection, request: Request) -> sqlite3
     return device
 
 
+# How long the monitor waits without input before photos start. Normal is 5 minutes;
+# shorter waits are for testing and show the testing banner.
+IDLE_CHOICES = {10: "10 seconds", 30: "30 seconds", 60: "1 minute", 300: "5 minutes (normal)"}
+NORMAL_IDLE = 300
+
+
+def idle_seconds(conn: sqlite3.Connection) -> int:
+    value = int(db.get_setting(conn, "test_idle_seconds", str(NORMAL_IDLE)))
+    return value if value in IDLE_CHOICES else NORMAL_IDLE
+
+
+def _testing_page(request, conn, device, status_code=200, error=None):
+    return page(request, "pretend_date.html", status_code, device=device, real=date.today(), current=today(conn),
+                error=error, idle=idle_seconds(conn), IDLE_CHOICES=IDLE_CHOICES)
+
+
 @app.get("/settings/date")
 def pretend_form(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
     device = require_trusted_owner(conn, request)
-    return page(request, "pretend_date.html", device=device, real=date.today(), current=today(conn), error=None)
+    return _testing_page(request, conn, device)
 
 
 @app.post("/settings/date")
 async def pretend_save(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
     device = require_trusted_owner(conn, request)
     form = await request.form()
-    if form.get("action") == "real":
-        conn.execute("DELETE FROM settings WHERE key = 'pretend_date'")
+    if form.get("action") == "normal":
+        conn.execute("DELETE FROM settings WHERE key IN ('pretend_date', 'test_idle_seconds')")
         return RedirectResponse("/", status_code=303)
     try:
         chosen = date.fromisoformat(str(form.get("date", "")))
+        idle = int(str(form.get("idle", NORMAL_IDLE)))
     except ValueError:
-        return page(request, "pretend_date.html", 400, device=device, real=date.today(), current=today(conn),
-                    error="Please pick a date.")
-    db.set_setting(conn, "pretend_date", chosen.isoformat())
+        return _testing_page(request, conn, device, 400, error="Please pick a date.")
+    if chosen == date.today():
+        conn.execute("DELETE FROM settings WHERE key = 'pretend_date'")
+    else:
+        db.set_setting(conn, "pretend_date", chosen.isoformat())
+    if idle in IDLE_CHOICES and idle != NORMAL_IDLE:
+        db.set_setting(conn, "test_idle_seconds", str(idle))
+    else:
+        conn.execute("DELETE FROM settings WHERE key = 'test_idle_seconds'")
     return RedirectResponse("/", status_code=303)
 
 
@@ -420,6 +445,8 @@ def person_remove(person_id: int, request: Request, conn: sqlite3.Connection = D
     if not person["is_owner"]:
         conn.execute("DELETE FROM people WHERE id = ?", (person_id,))
     return RedirectResponse("/people", status_code=303)
+
+
 
 
 # ---------- Photos (phone) ----------
@@ -639,11 +666,12 @@ def _screen_build() -> str:
 
 @app.get("/screen")
 def screen(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
-    return page(request, "screen.html", build=_screen_build(), **_screen_context(conn))
+    return page(request, "screen.html", build=_screen_build(), idle=idle_seconds(conn), **_screen_context(conn))
 
 
 @app.get("/screen/content")
 def screen_content(request: Request, conn: sqlite3.Connection = Depends(get_conn)) -> Response:
     response = page(request, "_screen_content.html", **_screen_context(conn))
     response.headers["X-Screen-Build"] = _screen_build()
+    response.headers["X-Screen-Idle"] = str(idle_seconds(conn))
     return response

@@ -3,7 +3,8 @@
 // URL params override timings for testing, e.g. /screen?idle=10&night=0-24
 (function () {
   const params = new URLSearchParams(location.search);
-  const IDLE_MS = (Number(params.get("idle")) || 5 * 60) * 1000;
+  // Wait before photos and night dim: ?idle= for a quick test, else the Pi's setting (5 minutes unless testing).
+  let IDLE_MS = (Number(params.get("idle")) || Number(document.body.dataset.idle) || 5 * 60) * 1000;
   const [NIGHT_START, NIGHT_END] = (params.get("night") || "22-5").split("-").map(Number);
   const CURSOR_MS = 5000;
   const REFRESH_MS = 10 * 1000;
@@ -70,6 +71,8 @@
       if (!res.ok) return;
       const build = res.headers.get("X-Screen-Build");
       if (build && build !== document.body.dataset.build) { location.reload(); return; }  // app was updated
+      const idle = Number(res.headers.get("X-Screen-Idle"));
+      if (idle && !params.get("idle")) IDLE_MS = idle * 1000;
       const html = await res.text();
       const content = document.getElementById("content");
       if (content.dataset.html !== html) {

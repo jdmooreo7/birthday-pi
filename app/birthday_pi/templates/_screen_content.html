@@ -21,7 +21,7 @@
 {% elif reminders %}
 <div class="reminders" data-reminders="{{ reminder_keys }}">
   <div class="topline">
-    <div class="small-date">{{ today.strftime("%A, %B") }} {{ today.day }}{% if pretend %} <span class="pretend">testing</span>{% endif %}</div>
+    <div class="small-date">{{ today.strftime("%A, %B") }} {{ today.day }}{% if pretend or test_idle %} <span class="pretend">testing</span>{% endif %}</div>
     <div id="clock" class="small-clock">{{ now.strftime("%-I:%M") }}</div>
   </div>
   {% for r, px in reminders %}
@@ -49,7 +49,7 @@
   <div class="home-main">
     <div class="clock-col">
       <div id="clock">{{ now.strftime("%-I:%M") }}</div>
-      <div id="date">{{ today.strftime("%A, %B") }} {{ today.day }}{% if pretend %} <span class="pretend">testing</span>{% endif %}</div>
+      <div id="date">{{ today.strftime("%A, %B") }} {{ today.day }}{% if pretend or test_idle %} <span class="pretend">testing</span>{% endif %}</div>
     </div>
     <div class="coming">
       <h2>Coming up</h2>

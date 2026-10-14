@@ -40,3 +40,4 @@ Decisions made by the Product Owner, newest last. The storyboard (`birthday_pi_s
 | 2026-10-14 | Backlog: a "family tree that fills in" screen on Grandma's phone that shows missing birthdays at a glance (`features/family-tree-progress.md`). |
 | 2026-10-14 | Photos are stored at screen size (originals not kept) with location and camera details removed. "No" on a waiting photo deletes it from the Pi. Up to 50 photos per upload, 25 MB each; uploads stop when the SD card has under 2 GB free. |
 | 2026-10-14 | On the monitor, Grandma's PIN unlocks photo approval for 10 minutes or until she taps Done. |
+| 2026-10-14 | The testing page also sets how long the monitor waits before photos (10 s, 30 s, 1 min, or the normal 5 min); a testing banner shows while it is shorter. |
