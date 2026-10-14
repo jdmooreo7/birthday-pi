@@ -20,7 +20,7 @@ A small, local-only family reminder screen for a Raspberry Pi 5. It runs in Dock
 ## Step 0: Set up the Pi (skip if it's already running)
 
 1. On another computer, install [Raspberry Pi Imager](https://www.raspberrypi.com/software/) and write **Raspberry Pi OS (64-bit)** to the SD card.
-2. In Imager's settings, set a hostname, a username and password, your Wi-Fi name and password, and **enable SSH**. This saves you from needing a keyboard and monitor for setup.
+2. In Imager's settings, set the hostname to **`birthdaypi`** (recommended; it's the address Birthday Pi shows to phones by default), a username and password, your Wi-Fi name and password, and **enable SSH**. This saves you from needing a keyboard and monitor for setup.
 3. Put the card in the Pi, power it on, and give it a minute or two to boot.
 4. Open a terminal **on the Pi**, or connect from your computer:
    ```sh
@@ -82,12 +82,23 @@ docker compose up -d
 
 The first run builds the app, which takes a few minutes on a Pi. Docker starts it again automatically whenever the Pi reboots.
 
-The setup QR code on the monitor points phones to `http://birthdaypi.local:8080`. If your Pi has a different hostname, tell Birthday Pi once, then restart it:
+### Tell Birthday Pi its address
+
+The monitor tells phones where to go: the setup QR code before setup, and the line "Add birthdays from a phone: …" afterwards. Both come from one setting, `BIRTHDAY_PI_URL`, which defaults to `http://birthdaypi.local:8080`.
+
+**If your Pi's hostname is `birthdaypi` and you kept port 8080, you can skip this.** Otherwise (check with `hostname`), set it once and restart:
 
 ```sh
-echo "BIRTHDAY_PI_URL=http://<your-hostname>.local:8080" > ~/birthday-pi/.env
+cd ~/birthday-pi
+echo "BIRTHDAY_PI_URL=http://$(hostname).local:8080" > .env
 docker compose up -d
 ```
+
+Check it worked: `docker compose exec app printenv BIRTHDAY_PI_URL`.
+
+- Use the form `http://<name-or-address>:<port>`, with no `/` at the end.
+- If you changed the port in `compose.yaml`, use that port here too.
+- If a phone can't open the `.local` address (some Android phones can't), use the Pi's IP address instead, for example `BIRTHDAY_PI_URL=http://192.168.1.50:8080`. Reserve that address for the Pi in your router's settings (often called a "DHCP reservation") so it doesn't change.
 
 ## Step 3: See it
 
@@ -114,7 +125,7 @@ cp ~/birthday-pi/kiosk/birthday-pi-kiosk.desktop ~/.config/autostart/
 sudo reboot
 ```
 
-When the Pi comes back up, it opens Birthday Pi full-screen. This assumes the repo is at `~/birthday-pi`. To point the kiosk somewhere else, set `BIRTHDAY_PI_URL`. To turn the kiosk off, delete `~/.config/autostart/birthday-pi-kiosk.desktop`.
+When the Pi comes back up, it opens Birthday Pi full-screen. This assumes the repo is at `~/birthday-pi`. The kiosk always opens `http://localhost:8080/screen` on the Pi itself, so it doesn't need the `.env` setting above (if you changed the port, edit it in `kiosk/kiosk.sh`). To turn the kiosk off, delete `~/.config/autostart/birthday-pi-kiosk.desktop`.
 
 ## Optional: enforce the memory limit
 
@@ -144,7 +155,8 @@ Run these from `~/birthday-pi`:
 
 - **`permission denied` running docker:** log out and back in after `usermod`, or reboot.
 - **Page won't load:** make sure your phone or computer is on the same Wi-Fi as the Pi, and check `docker compose ps` shows the container as `running`.
-- **"port is already allocated" or "address already in use":** something else on the Pi is using port 8080. Change `"8080:8080"` in `compose.yaml` to another port, such as `"8081:8080"`, and use that port in the address (and in `BIRTHDAY_PI_URL`).
+- **"port is already allocated" or "address already in use":** something else on the Pi is using port 8080. Change `"8080:8080"` in `compose.yaml` to another port, such as `"8081:8080"`, and use that port in the address, in `BIRTHDAY_PI_URL` (see Step 2) and in `kiosk/kiosk.sh`.
+- **The address or QR code on the monitor doesn't work on a phone:** set `BIRTHDAY_PI_URL` to match your Pi (see "Tell Birthday Pi its address" in Step 2). Try the Pi's IP address if the `.local` name doesn't work.
 - **`git: command not found`:** run `sudo apt install -y git`.
 
 ## Your photos stay yours

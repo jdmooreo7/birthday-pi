@@ -13,7 +13,7 @@ eval "$(tr '\0' '\n' < /proc/"$LABWC_PID"/environ | grep -E '^(WAYLAND_DISPLAY|X
 
 restart_kiosk() {
   pkill -f /usr/lib/chromium/chromium; sleep 2
-  BIRTHDAY_PI_URL="$1" setsid nohup "$DIR/kiosk.sh" >/dev/null 2>&1 &
+  BIRTHDAY_PI_SCREEN_URL="$1" setsid nohup "$DIR/kiosk.sh" >/dev/null 2>&1 &
 }
 
 echo "test: http://localhost:8080/?$QUERY for ${SECONDS_TO_RUN}s"
