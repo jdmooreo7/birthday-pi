@@ -37,6 +37,8 @@
     try {
       const res = await fetch("/screen/content", { cache: "no-store" });
       if (!res.ok) return;
+      const build = res.headers.get("X-Screen-Build");
+      if (build && build !== document.body.dataset.build) { location.reload(); return; }  // app was updated
       const html = await res.text();
       const content = document.getElementById("content");
       if (content.dataset.html !== html) {

@@ -196,3 +196,8 @@ def test_pretend_date_needs_grandma_and_shows_banner(client):
     assert "testing" in client.get("/screen/content").text
     client.post("/settings/date", data={"action": "real"})
     assert "Testing: pretending" not in client.get("/").text
+
+
+def test_screen_reports_its_build_so_it_can_reload(client):
+    build = client.get("/screen/content").headers["X-Screen-Build"]
+    assert f'data-build="{build}"' in client.get("/screen").text

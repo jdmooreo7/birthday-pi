@@ -435,11 +435,18 @@ def _screen_context(conn: sqlite3.Connection) -> dict:
                         if active and c.when > active[0].when][:3]}
 
 
+def _screen_build() -> str:
+    """Changes whenever the monitor's script or styles change; the open screen reloads itself."""
+    return static_url("screen.js") + static_url("screen.css")
+
+
 @app.get("/screen")
 def screen(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
-    return page(request, "screen.html", **_screen_context(conn))
+    return page(request, "screen.html", build=_screen_build(), **_screen_context(conn))
 
 
 @app.get("/screen/content")
 def screen_content(request: Request, conn: sqlite3.Connection = Depends(get_conn)) -> Response:
-    return page(request, "_screen_content.html", **_screen_context(conn))
+    response = page(request, "_screen_content.html", **_screen_context(conn))
+    response.headers["X-Screen-Build"] = _screen_build()
+    return response
