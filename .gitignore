@@ -9,3 +9,10 @@ spikes/*/results/
 
 # Private, device-specific project notes (Pi address, SSH user, Wi-Fi)
 CLAUDE.local.md
+
+# Local settings for docker compose (e.g. BIRTHDAY_PI_URL)
+.env
+
+# Python
+__pycache__/
+.pytest_cache/

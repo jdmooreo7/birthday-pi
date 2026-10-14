@@ -2,7 +2,7 @@
 
 A small, local-only family reminder screen for a Raspberry Pi 5. It runs in Docker on your home network and shows birthdays and reminders on a monitor.
 
-> **Status: early.** Right now this repo has a placeholder screen, a monitor kiosk script, and the design docs. The real app is still being built. See [`docs/birthday_pi_storyboard.html`](docs/birthday_pi_storyboard.html) for the plan and [`docs/product-decisions.md`](docs/product-decisions.md) for decisions so far.
+> **Status: early (milestone 1 of the first test release).** Birthday Pi can be set up from a phone, Grandma has a PIN, and the family can add people, birthdays and anniversaries, which show on the monitor. Reminders and photos come in the next milestones ([build plan](docs/build-plan-v1.md)). See [`docs/birthday_pi_storyboard.html`](docs/birthday_pi_storyboard.html) for the plan and [`docs/product-decisions.md`](docs/product-decisions.md) for decisions so far.
 >
 > Tested on a Raspberry Pi 5 (4 GB) with Raspberry Pi OS 64-bit (Debian 13 "trixie"), Docker 29 and Compose v5. Not yet tested starting from a blank SD card, so tell us if a step is missing (open an issue).
 
@@ -76,11 +76,18 @@ If the last command prints "Hello from Docker!", you're ready. If you see `permi
 
 ```sh
 git clone https://github.com/jdmooreo7/birthday-pi.git ~/birthday-pi
-cd ~/birthday-pi/placeholder
+cd ~/birthday-pi
 docker compose up -d
 ```
 
-The first run downloads a small web server image, which takes a minute. Docker will also start it again automatically whenever the Pi reboots.
+The first run builds the app, which takes a few minutes on a Pi. Docker starts it again automatically whenever the Pi reboots.
+
+The setup QR code on the monitor points phones to `http://birthdaypi.local:8080`. If your Pi has a different hostname, tell Birthday Pi once, then restart it:
+
+```sh
+echo "BIRTHDAY_PI_URL=http://<your-hostname>.local:8080" > ~/birthday-pi/.env
+docker compose up -d
+```
 
 ## Step 3: See it
 
@@ -92,7 +99,9 @@ hostname -I
 
 Then, from any phone or computer **on the same home network**, open `http://<that-address>:8080/`. For example `http://192.168.1.50:8080/`. You can also use `http://<your-hostname>.local:8080/` on most networks.
 
-You should see the placeholder Birthday Pi screen.
+- **On a phone:** the first visit opens setup. Type what the family calls Grandma and have her choose a 4-digit PIN. Then each person picks their name once on their own phone, and you add the family.
+- **The monitor screen** is at `/screen` (the kiosk below opens it). Before setup it shows a QR code to scan; after setup it shows the clock and who's coming up.
+- **Just trying it out?** Load a sample family instead of doing setup (only on a fresh install): `docker compose exec app python -m birthday_pi.cli load-sample`. Grandma's PIN is then `1234`.
 
 ## Optional: show it full-screen on the Pi's monitor (kiosk)
 
@@ -109,7 +118,7 @@ When the Pi comes back up, it opens Birthday Pi full-screen. This assumes the re
 
 ## Optional: enforce the memory limit
 
-The compose file caps the web container at 32 MB. On a stock Raspberry Pi OS the kernel's memory controller is off, so Docker may print a warning that the limit isn't enforced. The app still runs. To enforce it, add `cgroup_enable=memory` to the end of the **single line** in `/boot/firmware/cmdline.txt` and reboot. This edits a boot file, so make a backup first and skip it if you're not comfortable:
+The compose file caps the app container at 256 MB. On a stock Raspberry Pi OS the kernel's memory controller is off, so Docker may print a warning that the limit isn't enforced. The app still runs. To enforce it, add `cgroup_enable=memory` to the end of the **single line** in `/boot/firmware/cmdline.txt` and reboot. This edits a boot file, so make a backup first and skip it if you're not comfortable:
 
 ```sh
 sudo cp /boot/firmware/cmdline.txt /boot/firmware/cmdline.txt.bak
@@ -121,25 +130,26 @@ If the Pi doesn't boot, put the SD card in another computer and rename `cmdline.
 
 ## Everyday commands
 
-Run these from `~/birthday-pi/placeholder`:
+Run these from `~/birthday-pi`:
 
 | Do this | Command |
 |---|---|
 | See what's running | `docker compose ps` |
 | Stop it | `docker compose down` |
 | Start it again | `docker compose up -d` |
-| Update to the latest version | `cd ~/birthday-pi && git pull`, then `cd placeholder && docker compose up -d --force-recreate` |
+| Update to the latest version | `git pull`, then `docker compose up -d --build` |
+| Grandma forgot her PIN | `docker compose exec app python -m birthday_pi.cli reset-pin` (her phones will ask for the new PIN) |
 
 ## Troubleshooting
 
 - **`permission denied` running docker:** log out and back in after `usermod`, or reboot.
 - **Page won't load:** make sure your phone or computer is on the same Wi-Fi as the Pi, and check `docker compose ps` shows the container as `running`.
-- **"port is already allocated" or "address already in use":** something else on the Pi is using port 8080. Change `"8080:80"` in `placeholder/compose.yaml` to another port, such as `"8081:80"`, and use that port in the address.
+- **"port is already allocated" or "address already in use":** something else on the Pi is using port 8080. Change `"8080:8080"` in `compose.yaml` to another port, such as `"8081:8080"`, and use that port in the address (and in `BIRTHDAY_PI_URL`).
 - **`git: command not found`:** run `sudo apt install -y git`.
 
 ## Your photos stay yours
 
-Real family photos and face data are never committed to this repo (see `.gitignore`). Put your own photos in `placeholder/photos/` on the Pi only. The files there now are samples.
+Names, dates and (later) photos are kept in a Docker volume on the Pi, never in this repo. Real family photos and face data are never committed (see `.gitignore`).
 
 ## License
 

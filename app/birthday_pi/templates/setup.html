@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Set up Birthday Pi{% endblock %}
+{% block content %}
+<h1>Welcome to Birthday Pi</h1>
+<p>Birthday Pi reminds Grandma of the family's birthdays and anniversaries, and shows family photos on her screen.</p>
+<form method="post" action="/setup" novalidate>
+  <div class="field{% if errors.owner_name %} has-error{% endif %}">
+    <label for="owner_name">What does the family call her?</label>
+    <input id="owner_name" name="owner_name" value="{{ owner_name }}" maxlength="40" autocomplete="off" required>
+    {% if errors.owner_name %}<div class="error">{{ errors.owner_name }}</div>{% endif %}
+  </div>
+  <div class="notice">{{ owner_name or "Grandma" }} now picks a 4-digit PIN. It lets her approve photos, and only she should know it.</div>
+  <div class="field{% if errors.pin %} has-error{% endif %}">
+    <label for="pin">Her PIN</label>
+    <input id="pin" name="pin" class="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="new-password" required>
+    {% if errors.pin %}<div class="error">{{ errors.pin }}</div>{% endif %}
+  </div>
+  <div class="field{% if errors.pin2 %} has-error{% endif %}">
+    <label for="pin2">Type the PIN again</label>
+    <input id="pin2" name="pin2" class="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="new-password" required>
+    {% if errors.pin2 %}<div class="error">{{ errors.pin2 }}</div>{% endif %}
+  </div>
+  <button class="btn" type="submit">Save and continue</button>
+</form>
+<p class="muted small">Names, dates and photos stay on this Pi. Nothing is sent to the internet.</p>
+{% endblock %}

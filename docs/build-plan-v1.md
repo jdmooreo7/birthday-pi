@@ -53,6 +53,7 @@ Reminders depend on the date, so waiting two weeks to test the card reminder isn
 - **Who:** Grandma, plus 2–3 family members who visit her.
 - **Tasks to watch:** set up the Pi from scratch; add a birthday; upload photos as a visitor; Grandma approves them on the monitor and on her phone; acknowledge a reminder; hide a photo.
 - **What to learn:** where people hesitate, whether reminders are noticed and readable from across the room, whether the PIN feels like a hurdle, and whether anyone misses face recognition.
+- **When:** the Product Owner runs a short usability check at the end of every milestone (M1 to M4), then the full test after v0.1. Tests start with the sample family.
 - **How:** watch the first session in person; after that, a short check-in each week. The app keeps a simple local log of "Got it" times, which tells us how quickly reminders get noticed. It stays on the Pi.
 
 ## Risks
@@ -62,6 +63,4 @@ Reminders depend on the date, so waiting two weeks to test the card reminder isn
 - **Family photos of children.** Get the family's OK before testing with real photos.
 
 ## Questions for the Product Owner
-1. Who are the test users, and will the test run on the current Pi at Grandma's home or a second one?
-2. Should the test start with real family data, or with the sample family first?
-3. Is about 4 milestones then a test the right shape, or do you want a clickable demo after M2 to show the family early?
+1. Who are the test participants (the family members who will try it), and will the test run on the current Pi or a second one at Grandma's home?

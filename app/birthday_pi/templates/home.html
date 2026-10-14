@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<p class="muted">{{ today.strftime("%A, %B") }} {{ today.day }}</p>
+{% if people_count <= 1 %}
+<div class="card warm">
+  <h2>Let's add the family</h2>
+  <p>Add the people {{ device.name if device.is_owner else "Grandma" }} wants to remember, with their birthdays.</p>
+  <a class="btn" href="/people/new">Add a person</a>
+</div>
+{% else %}
+<div class="row2">
+  <a class="btn" href="/people/new">Add a person</a>
+  <a class="btn secondary" href="/people">Everyone</a>
+</div>
+{% endif %}
+{% if missing %}
+<a class="card" href="/people" style="text-decoration: none; color: inherit">
+  <span class="name">{{ missing | length }} {{ "person needs" if missing | length == 1 else "people need" }} a birthday</span>
+  <span class="muted small">{{ missing | map(attribute="name") | join(", ") }}</span>
+</a>
+{% endif %}
+<section class="list" aria-labelledby="coming">
+  <h2 id="coming">Coming up</h2>
+  {% for c in upcoming %}
+  <div class="item">
+    <span class="avatar">{{ c.initial }}</span>
+    <span class="grow"><span class="name">{{ c.name }}</span><span class="muted small">{{ c.detail }}</span></span>
+    <span class="right">{{ short_date(c.when) }}<br><span class="muted small">{{ how_far(c.days_away) }}</span></span>
+  </div>
+  {% else %}
+  <p class="muted">No birthdays yet. Add someone's birthday and it shows up here.</p>
+  {% endfor %}
+</section>
+{% endblock %}

@@ -1,0 +1,46 @@
+{% if mode == "welcome" %}
+<div class="welcome">
+  <div class="brand">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#ffb347" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21h16v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2z"/><path d="M4 16c2 1.5 4 1.5 5.3 0 1.3 1.5 4 1.5 5.4 0 1.3 1.5 3.3 1.5 5.3 0"/><path d="M12 11V7"/><path d="M12 3.5c.8.9 1 1.8 0 2.5-1-.7-.8-1.6 0-2.5z"/></svg>
+    Birthday Pi
+  </div>
+  <div>
+    <h1>Let's meet your family.</h1>
+    <div class="join">
+      <div class="qr" role="img" aria-label="QR code that opens the setup page">{{ qr_svg | safe }}</div>
+      <div class="join-text">
+        <div class="big">Scan with your phone to start</div>
+        <div class="mid">or type this into your phone's browser:</div>
+        <div class="url">{{ setup_url }}</div>
+        <div class="mid">Your phone needs to be on this Wi-Fi.</div>
+      </div>
+    </div>
+  </div>
+  <div class="footnote">Names, dates and photos stay on this Pi. Nothing goes to the internet.</div>
+</div>
+{% else %}
+<div class="home">
+  <div class="home-main">
+    <div class="clock-col">
+      <div id="clock">{{ now.strftime("%-I:%M") }}</div>
+      <div id="date">{{ today.strftime("%A, %B") }} {{ today.day }}</div>
+    </div>
+    <div class="coming">
+      <h2>Coming up</h2>
+      {% for c in upcoming %}
+      <div class="event">
+        <div class="avatar">{{ c.initial }}</div>
+        <div class="grow"><div class="who">{{ c.name }}</div><div class="what">{{ c.detail }}</div></div>
+        <div class="when"><div class="day">{{ short_date(c.when) }}</div><div class="away">{{ how_far(c.days_away) }}</div></div>
+      </div>
+      {% else %}
+      <div class="empty">No birthdays yet. Add them from a phone at the address on the setup card.</div>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="status">
+    <span>{% if missing_count %}{{ missing_count }} {{ "person still needs" if missing_count == 1 else "people still need" }} a birthday{% endif %}</span>
+    <span>Add birthdays from a phone: {{ phone_url }}</span>
+  </div>
+</div>
+{% endif %}

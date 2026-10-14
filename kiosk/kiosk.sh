@@ -1,6 +1,6 @@
 #!/bin/sh
 # Launch Chromium full-screen on the Pi's monitor, showing the Birthday Pi screen.
-URL="${BIRTHDAY_PI_URL:-http://localhost:8080/}"
+URL="${BIRTHDAY_PI_URL:-http://localhost:8080/screen}"
 
 # Wait up to 2 minutes for the web container to answer after boot.
 i=0

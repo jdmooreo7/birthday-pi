@@ -1,0 +1,19 @@
+# Birthday Pi. Start with: docker compose up -d
+services:
+  app:
+    build: ./app
+    image: birthday-pi:local
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # The address phones use to reach this Pi (shown as a QR code on the monitor).
+      BIRTHDAY_PI_URL: ${BIRTHDAY_PI_URL:-http://birthdaypi.local:8080}
+    volumes:
+      - data:/data
+      # Use the Pi's time zone so "today" matches the wall clock.
+      - /etc/localtime:/etc/localtime:ro
+    mem_limit: 256m
+
+volumes:
+  data:

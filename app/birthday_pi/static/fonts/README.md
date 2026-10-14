@@ -1,0 +1,1 @@
+Atkinson Hyperlegible (Latin subset, 400 and 700) by the Braille Institute of America, licensed under the SIL Open Font License 1.1 (https://openfontlicense.org). Bundled so the app needs no internet.

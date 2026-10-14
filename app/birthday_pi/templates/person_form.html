@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}{{ person.name if person else "Add a person" }}{% endblock %}
+{% block content %}
+{% if welcome %}<div class="notice">Hi {{ person.name }}! Add your own birthday so Grandma remembers it, or skip this for now.</div>{% endif %}
+<h1>{{ person.name if person else "Add a person" }}</h1>
+<form method="post" action="{{ '/people/' ~ person.id if person else '/people/new' }}" novalidate>
+  <div class="field{% if errors.name %} has-error{% endif %}">
+    <label for="name">Name</label>
+    <input id="name" name="name" value="{{ values.name }}" maxlength="40" autocomplete="off" required>
+    {% if errors.name %}<div class="error">{{ errors.name }}</div>{% endif %}
+  </div>
+  <fieldset>
+    <legend>Birthday</legend>
+    {% with prefix = "birth" %}{% include "_date_fields.html" %}{% endwith %}
+  </fieldset>
+  <fieldset>
+    <legend>Anniversary <span class="muted small" style="font-weight: 400">(optional)</span></legend>
+    <div class="field{% if errors.partner_id %} has-error{% endif %}">
+      <label for="partner_id">With</label>
+      <select id="partner_id" name="partner_id">
+        <option value="">No one</option>
+        {% for o in others %}<option value="{{ o.id }}"{% if values.partner_id == o.id | string %} selected{% endif %}>{{ o.name }}</option>{% endfor %}
+      </select>
+      {% if errors.partner_id %}<div class="error">{{ errors.partner_id }}</div>{% endif %}
+    </div>
+    {% with prefix = "ann" %}{% include "_date_fields.html" %}{% endwith %}
+  </fieldset>
+  <button class="btn" type="submit">Save</button>
+</form>
+{% if welcome %}<a class="btn quiet" href="/">I'll add it later</a>{% else %}<a class="btn quiet" href="/people">Cancel</a>{% endif %}
+{% if person and not person.is_owner and not welcome %}<a class="btn quiet" href="/people/{{ person.id }}/remove">Remove {{ person.name }}</a>{% endif %}
+{% endblock %}

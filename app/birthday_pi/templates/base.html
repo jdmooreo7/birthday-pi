@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Birthday Pi{% endblock %}</title>
+<link rel="stylesheet" href="/static/fonts.css">
+<link rel="stylesheet" href="/static/phone.css">
+</head>
+<body>
+<main>
+  <div class="top">
+    <a class="brand" href="/">Birthday Pi</a>
+    {% if device %}<div class="who">{{ device.name }} · <a href="/who">Not you?</a></div>{% endif %}
+  </div>
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

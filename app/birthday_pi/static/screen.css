@@ -1,0 +1,41 @@
+/* Monitor screen, designed for 1920 x 1080 and scaled with the viewport. */
+:root { --bg: #1d1b2f; --fg: #fdf6ec; --muted: #b9b3cc; --card: #2a2742; --avatar: #4a4568; --accent: #ffb347; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); overflow: hidden;
+  font-family: "Atkinson Hyperlegible", system-ui, sans-serif; }
+/* 1vh = 10.8px on the 1080p monitor; sizes below are the mockup's px / 10.8. */
+#content { height: 100%; box-sizing: border-box; }
+.welcome { height: 100%; box-sizing: border-box; padding: 8.9vh 8.3vw; display: flex; flex-direction: column;
+  justify-content: space-between; }
+.brand { display: flex; align-items: center; gap: 1.9vh; font-size: 4.1vh; font-weight: 700; }
+.brand svg { width: 5.2vh; height: 5.2vh; }
+.welcome h1 { margin: 0 0 6.7vh; font-size: 11.1vh; line-height: 1.05; }
+.join { display: flex; align-items: center; gap: 4.2vw; }
+.qr { width: 31.5vh; height: 31.5vh; flex-shrink: 0; border-radius: 2.2vh; overflow: hidden; background: var(--fg); }
+.qr svg { width: 100%; height: 100%; display: block; }
+.join-text { display: flex; flex-direction: column; gap: 2.2vh; }
+.join-text .big { font-size: 5.6vh; font-weight: 700; }
+.join-text .mid { font-size: 4.1vh; color: var(--muted); }
+.join-text .url { font-size: 4.8vh; font-weight: 700; color: var(--accent); }
+.footnote { font-size: 3.1vh; color: var(--muted); }
+.home { height: 100%; box-sizing: border-box; padding: 7.4vh 6.25vw 5.9vh; display: flex; flex-direction: column; gap: 5.2vh; }
+.home-main { flex: 1 1 auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5vw; min-height: 0; }
+.clock-col { display: flex; flex-direction: column; justify-content: center; gap: 1.5vh; }
+#clock { font-size: 24vh; line-height: 1; font-variant-numeric: tabular-nums; }
+#date { font-size: 5.9vh; color: var(--muted); }
+.coming { display: flex; flex-direction: column; justify-content: center; gap: 2.6vh; }
+.coming h2 { margin: 0; font-size: 4.8vh; }
+.event { display: flex; align-items: center; gap: 2.6vh; padding: 2.2vh 3vh; background: var(--card); border-radius: 2.2vh; }
+.event .avatar { width: 8.1vh; height: 8.1vh; border-radius: 50%; background: var(--avatar); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 3.7vh; font-weight: 700; }
+.event .grow { flex: 1 1 auto; min-width: 0; }
+.event .who { font-size: 4.1vh; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.event .what, .event .away { font-size: 3vh; color: var(--muted); }
+.event .when { display: flex; flex-direction: column; align-items: flex-end; }
+.event .day { font-size: 3.7vh; font-weight: 700; }
+.empty { font-size: 3.7vh; color: var(--muted); }
+.status { display: flex; justify-content: space-between; align-items: center; padding: 2.6vh 3.7vh;
+  background: var(--card); border-radius: 2.2vh; font-size: 3.5vh; color: var(--muted); min-height: 4vh; }
+/* Night dim: 85% dark from 10pm to 5am while idle; any input lifts it. */
+#night { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity 3s ease; }
+body.night #night { opacity: 0.85; }
+body.idle-cursor { cursor: none; }

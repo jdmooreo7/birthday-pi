@@ -30,3 +30,5 @@ Decisions made by the Product Owner, newest last. The storyboard (`birthday_pi_s
 | 2026-10-14 | The Pi's hostname is `birthdaypi`, so it's reachable at `birthdaypi.local`. |
 | 2026-10-14 | Each device picks "Who's this?" from the family list once (no accounts). Choosing Grandma asks for her PIN once; that device is then trusted as Grandma: her uploads show straight away and she approves without the PIN. The shared monitor always asks for the PIN. |
 | 2026-10-14 | Grandma can hide any approved photo later. |
+| 2026-10-14 | Usability testing starts with the sample family, not real family data. |
+| 2026-10-14 | The Product Owner runs a short usability check at the end of every milestone, starting with M1 (M0's skeleton is built as part of M1). |
