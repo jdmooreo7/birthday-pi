@@ -24,3 +24,9 @@ Decisions made by the Product Owner, newest last. The storyboard (`birthday_pi_s
 | 2026-10-14 | Integrations are not in v1. They're a future feature (`features/integrations.md`). |
 | 2026-10-14 | Grandma can approve photos on the monitor and on her phone or tablet browser. A text message with an approval link is a future feature (`features/photo-approval-text-notification.md`). |
 | 2026-10-14 | v1 protects photo approval with a 4-digit PIN. |
+| 2026-10-14 | First usability release covers the core loop: add people and dates by hand, reminders with "Got it", photo upload with Grandma's PIN approval, and the slideshow. Face recognition follows in a second test build. |
+| 2026-10-14 | Grandma picks her 4-digit PIN during first setup. A forgotten PIN is reset with a command run on the Pi by a family member. |
+| 2026-10-14 | "Got it" on a reminder never needs the PIN. |
+| 2026-10-14 | The Pi's hostname is `birthdaypi`, so it's reachable at `birthdaypi.local`. |
+| 2026-10-14 | Each device picks "Who's this?" from the family list once (no accounts). Choosing Grandma asks for her PIN once; that device is then trusted as Grandma: her uploads show straight away and she approves without the PIN. The shared monitor always asks for the PIN. |
+| 2026-10-14 | Grandma can hide any approved photo later. |
