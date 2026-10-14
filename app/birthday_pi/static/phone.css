@@ -1,0 +1,73 @@
+/* Phone and tablet pages. Colours and sizes follow the "Birthday Pi v1 screens" mockups. */
+:root { --bg: #fff7ef; --ink: #2b2b3a; --muted: #5d5a6e; --accent: #a83a68; --accent-dark: #7e2a4e;
+  --card: #ffffff; --line: #e6dccf; --warm: #ffd591; --error: #b3261e; }
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 18px/1.4 "Atkinson Hyperlegible", system-ui, sans-serif; }
+main { max-width: 560px; margin: 0 auto; padding: 20px 20px 40px; display: flex; flex-direction: column; gap: 18px; }
+a { color: var(--accent); font-weight: 700; }
+a:hover { color: var(--accent-dark); }
+h1 { margin: 0; font-size: 30px; line-height: 1.2; }
+h2 { margin: 0; font-size: 21px; }
+p { margin: 0; }
+.muted { color: var(--muted); }
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
+.brand { font-size: 21px; font-weight: 700; color: var(--ink); text-decoration: none; }
+.who { font-size: 16px; color: var(--muted); text-align: right; }
+.card { background: var(--card); border: 2px solid var(--line); border-radius: 18px; padding: 16px 18px;
+  display: flex; flex-direction: column; gap: 10px; }
+.card.warm { background: var(--warm); border-color: var(--warm); }
+.btn { display: flex; align-items: center; justify-content: center; min-height: 56px; padding: 0 20px;
+  border-radius: 14px; font: inherit; font-weight: 700; font-size: 19px; text-decoration: none; cursor: pointer;
+  background: var(--accent); color: #fff; border: 2px solid var(--accent); width: 100%; }
+.btn:hover { background: var(--accent-dark); border-color: var(--accent-dark); color: #fff; }
+.btn.secondary { background: transparent; color: var(--ink); border-color: var(--ink); }
+.btn.secondary:hover { background: var(--ink); color: #fff; }
+.btn.quiet { background: transparent; border-color: transparent; color: var(--accent); min-height: 48px; }
+.btn.danger { background: var(--error); border-color: var(--error); }
+.row2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.list { display: flex; flex-direction: column; }
+.item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line);
+  color: var(--ink); text-decoration: none; font-weight: 400; min-height: 56px; }
+.item:hover { color: var(--ink); background: rgba(0,0,0,.02); }
+.avatar { width: 42px; height: 42px; flex-shrink: 0; border-radius: 50%; background: var(--line);
+  display: flex; align-items: center; justify-content: center; font-weight: 700; }
+.avatar.owner { background: var(--warm); }
+.grow { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.name { font-weight: 700; }
+.small { font-size: 15px; }
+.right { text-align: right; font-weight: 700; white-space: nowrap; }
+.choice { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 64px; padding: 8px 16px;
+  border: 2px solid var(--line); border-radius: 16px; background: var(--card); color: var(--ink);
+  font: inherit; font-size: 19px; text-align: left; cursor: pointer; }
+.choice:hover { border-color: var(--accent); }
+.choice.owner { border-color: var(--accent); }
+form { display: flex; flex-direction: column; gap: 16px; margin: 0; }
+fieldset { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+legend { font-weight: 700; font-size: 21px; padding: 0; margin-bottom: 4px; }
+label { font-weight: 700; display: block; margin-bottom: 6px; }
+.field { display: flex; flex-direction: column; }
+input, select { font: inherit; font-size: 20px; min-height: 52px; padding: 0 14px; width: 100%;
+  border: 2px solid var(--ink); border-radius: 12px; background: #fff; color: var(--ink); }
+input:focus, select:focus, .btn:focus-visible, .choice:focus-visible, a:focus-visible {
+  outline: 3px solid var(--accent); outline-offset: 2px; }
+.pin { letter-spacing: 0.6em; text-align: center; font-size: 30px; }
+.error { color: var(--error); font-weight: 700; font-size: 16px; margin-top: 6px; }
+.field.has-error input, .field.has-error select { border-color: var(--error); }
+.dates { display: grid; grid-template-columns: 1.4fr 1fr 1.1fr; gap: 10px; }
+.notice { background: var(--warm); border-radius: 14px; padding: 12px 16px; }
+.pretend { background: var(--ink); color: #fff; border-radius: 12px; padding: 10px 14px; font-weight: 700; font-size: 16px; }
+.reminder .label { font-size: 14px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.reminder .headline { font-weight: 700; line-height: 1.15; }
+.reminder .ack { flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; }
+.btn.dark { background: var(--ink); border-color: var(--ink); color: var(--bg); width: auto; min-height: 48px; padding: 0 24px; }
+.btn.dark:hover { background: #000; border-color: #000; }
+.thumbs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+.thumbs a { display: block; aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: var(--line); }
+.thumbs img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo { width: 100%; height: auto; border-radius: 14px; display: block; background: var(--line); }
+.checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.check { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 12px; margin: 0;
+  border: 2px solid var(--line); border-radius: 12px; background: var(--card); font-weight: 400; cursor: pointer; }
+.check input { width: 24px; height: 24px; min-height: 0; margin: 0; accent-color: var(--accent); }

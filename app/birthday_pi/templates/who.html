@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Who's using this phone?{% endblock %}
+{% block content %}
+<div>
+  <h1>Who's using this phone?</h1>
+  <p class="muted">We'll remember, so you only pick once.</p>
+</div>
+<form method="post" action="/who">
+  {% for p in people %}
+  <button class="choice{% if p.is_owner %} owner{% endif %}" type="submit" name="person_id" value="{{ p.id }}">
+    <span class="avatar{% if p.is_owner %} owner{% endif %}">{{ p.name[:1] | upper }}</span>
+    <span class="grow"><span class="name">{{ p.name }}</span></span>
+    {% if p.is_owner %}<span class="muted small">asks for PIN</span>{% endif %}
+  </button>
+  {% endfor %}
+</form>
+<form method="post" action="/who" class="card">
+  <div class="field">
+    <label for="new_name">Someone new? Type your name</label>
+    <input id="new_name" name="new_name" maxlength="40" autocomplete="given-name" required>
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+  </div>
+  <button class="btn secondary" type="submit">That's me</button>
+</form>
+{% endblock %}

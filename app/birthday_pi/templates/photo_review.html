@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Show these on the screen?{% endblock %}
+{% block content %}
+<h1>Show these on the screen?</h1>
+{% for ph in waiting %}
+<div class="card">
+  <img class="photo" src="/photo-files/{{ ph.id }}.jpg" alt="Photo added by {{ ph.uploader or 'someone' }}" loading="lazy">
+  <p class="muted small">Added by {{ ph.uploader or "someone" }} · <a href="/photos/{{ ph.id }}">Who's in it?</a></p>
+  <form method="post" action="/photos/{{ ph.id }}/decision" class="row2">
+    <input type="hidden" name="back" value="/photos/review">
+    <button class="btn" type="submit" name="action" value="approve">Yes, show it</button>
+    <button class="btn secondary" type="submit" name="action" value="reject">No</button>
+  </form>
+</div>
+{% else %}
+<p>All done. There are no photos waiting.</p>
+{% endfor %}
+<a class="btn secondary" href="/">Done</a>
+{% endblock %}

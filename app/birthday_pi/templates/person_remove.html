@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Remove {{ person.name }}{% endblock %}
+{% block content %}
+<h1>Remove {{ person.name }}?</h1>
+<p>Their birthday and any anniversary are removed from Birthday Pi. This can't be undone.</p>
+<form method="post" action="/people/{{ person.id }}/remove">
+  <button class="btn danger" type="submit">Remove {{ person.name }}</button>
+</form>
+<a class="btn quiet" href="/people/{{ person.id }}">Keep {{ person.name }}</a>
+{% endblock %}

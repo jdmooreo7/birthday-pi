@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Enter PIN{% endblock %}
+{% block content %}
+<div>
+  <h1>{{ owner.name }}, enter your PIN</h1>
+  <p class="muted">Just this once. After that, this phone knows it's you.</p>
+</div>
+{% if locked %}
+<div class="notice" role="alert">Too many tries. Please wait {{ locked }} seconds, then try again.</div>
+<a class="btn secondary" href="/pin">Try again</a>
+{% else %}
+<form method="post" action="/pin" novalidate>
+  <div class="field{% if error %} has-error{% endif %}">
+    <label for="pin">PIN</label>
+    <input id="pin" name="pin" class="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" autofocus required>
+    {% if error %}<div class="error" role="alert">{{ error }}</div>{% endif %}
+  </div>
+  <button class="btn" type="submit">Continue</button>
+</form>
+{% endif %}
+<a class="btn quiet" href="/who">Back</a>
+{% endblock %}

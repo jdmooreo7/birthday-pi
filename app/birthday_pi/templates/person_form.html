@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ person.name if person else "Add a person" }}{% endblock %}
+{% block content %}
+{% if welcome %}<div class="notice">Hi {{ person.name }}! Add your own birthday so Grandma remembers it, or skip this for now.</div>{% endif %}
+<h1>{{ person.name if person else "Add a person" }}</h1>
+<form method="post" action="{{ '/people/' ~ person.id if person else '/people/new' }}" novalidate>
+  <div class="field{% if errors.name %} has-error{% endif %}">
+    <label for="name">Name</label>
+    <input id="name" name="name" value="{{ values.name }}" maxlength="40" autocomplete="off" required>
+    {% if errors.name %}<div class="error">{{ errors.name }}</div>{% endif %}
+  </div>
+  <fieldset>
+    <legend>Birthday</legend>
+    {% with prefix = "birth" %}{% include "_date_fields.html" %}{% endwith %}
+  </fieldset>
+  <fieldset>
+    <legend>Anniversaries <span class="muted small" style="font-weight: 400">(optional)</span></legend>
+    <input type="hidden" name="ann_count" value="{{ values.ann_count }}">
+    {% for i in range(values.ann_count) %}
+    {% set prefix = "ann_" ~ i %}
+    <div class="card">
+      <div class="field{% if errors[prefix ~ '_kind'] %} has-error{% endif %}">
+        <label for="{{ prefix }}_kind">Kind</label>
+        <select id="{{ prefix }}_kind" name="{{ prefix }}_kind">
+          {% for key, label in ANNIVERSARY_TYPES.items() %}<option value="{{ key }}"{% if values[prefix ~ '_kind'] == key %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+        {% if errors[prefix ~ '_kind'] %}<div class="error">{{ errors[prefix ~ '_kind'] }}</div>{% endif %}
+      </div>
+      {% include "_date_fields.html" %}
+    </div>
+    {% endfor %}
+    <p class="muted small">To add another, save first. To remove one, set its month to "–".</p>
+  </fieldset>
+  <button class="btn" type="submit">Save</button>
+</form>
+{% if welcome %}<a class="btn quiet" href="/">I'll add it later</a>{% else %}<a class="btn quiet" href="/people">Cancel</a>{% endif %}
+{% if person and not person.is_owner and not welcome %}<a class="btn quiet" href="/people/{{ person.id }}/remove">Remove {{ person.name }}</a>{% endif %}
+{% endblock %}

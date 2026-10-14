@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Testing{% endblock %}
+{% block content %}
+<div>
+  <h1>Testing</h1>
+  <p class="muted">For trying things out without waiting. Everyone sees a banner while any of this is on.</p>
+</div>
+<form method="post" action="/settings/date" novalidate>
+  <div class="field{% if error %} has-error{% endif %}">
+    <label for="date">Pretend today is</label>
+    <input id="date" name="date" type="date" value="{{ current.isoformat() }}">
+    <span class="muted small">The real date is {{ real.strftime("%A, %B") }} {{ real.day }}.</span>
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+  </div>
+  <div class="field">
+    <label for="idle">Photos start on the monitor after</label>
+    <select id="idle" name="idle">
+      {% for seconds, label in IDLE_CHOICES.items() %}<option value="{{ seconds }}"{% if seconds == idle %} selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <span class="muted small">How long the monitor waits with no mouse or touch before the slideshow.</span>
+  </div>
+  <button class="btn" type="submit" name="action" value="save">Save</button>
+  <button class="btn secondary" type="submit" name="action" value="normal">Back to normal</button>
+</form>
+<a class="btn quiet" href="/">Back</a>
+{% endblock %}

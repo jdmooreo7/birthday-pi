@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Photos{% endblock %}
+{% block content %}
+<h1>Photos</h1>
+<div class="row2">
+  <a class="btn" href="/photos/add">Add photos</a>
+  {% if trusted_owner and pending %}<a class="btn secondary" href="/photos/review">Review {{ pending }}</a>{% else %}<a class="btn secondary" href="/">Home</a>{% endif %}
+</div>
+{% for title, items in sections %}
+<section class="list" aria-label="{{ title }}">
+  <h2>{{ title }} <span class="muted small" style="font-weight: 400">· {{ items | length }}</span></h2>
+  {% if items %}
+  <div class="thumbs">
+    {% for ph in items %}<a href="/photos/{{ ph.id }}"><img src="/photo-files/{{ ph.id }}-thumb.jpg" alt="Photo added by {{ ph.uploader or 'someone' }}" loading="lazy"></a>{% endfor %}
+  </div>
+  {% else %}
+  <p class="muted small">None.</p>
+  {% endif %}
+</section>
+{% endfor %}
+{% endblock %}

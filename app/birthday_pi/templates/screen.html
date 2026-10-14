@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Birthday Pi</title>
+<link rel="stylesheet" href="{{ static_url('fonts.css') }}">
+<link rel="stylesheet" href="{{ static_url('screen.css') }}">
+</head>
+<body data-build="{{ build }}" data-idle="{{ idle }}">
+<div id="content">{% include "_screen_content.html" %}</div>
+<div id="photos"><img alt=""><img alt=""><div id="photo-bar"><div id="photo-title"></div><div id="photo-clock"></div></div></div>
+<div id="night"></div>
+<script src="{{ static_url('screen.js') }}"></script>
+</body>
+</html>

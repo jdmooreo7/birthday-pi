@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+<p class="muted">{{ today.strftime("%A, %B") }} {{ today.day }}</p>
+{% for r in reminders %}
+<div class="card warm reminder">
+  <div class="label">{{ r.label }}</div>
+  <div class="headline" style="font-size: {{ (20 + r.size_px * 0.09) | round | int }}px">{{ r.headline }}</div>
+  <form method="post" action="/reminders/ack" class="ack">
+    <span>{{ r.sub }}</span>
+    <input type="hidden" name="key" value="{{ r.key }}">
+    <button class="btn dark" type="submit">Got it</button>
+  </form>
+</div>
+{% endfor %}
+{% if people_count <= 1 %}
+<div class="card warm">
+  <h2>Let's add the family</h2>
+  <p>Add the people {{ device.name if device.is_owner else "Grandma" }} wants to remember, with their birthdays.</p>
+  <a class="btn" href="/people/new">Add a person</a>
+</div>
+{% else %}
+<div class="row2">
+  <a class="btn" href="/people/new">Add a person</a>
+  <a class="btn secondary" href="/people">Everyone</a>
+</div>
+{% endif %}
+{% if pending and trusted_owner %}
+<div class="card">
+  <div class="top"><span class="name">{{ pending }} photo{{ "" if pending == 1 else "s" }} need{{ "s" if pending == 1 else "" }} your OK</span>
+  <a class="btn secondary" style="width: auto; min-height: 48px" href="/photos/review">Review</a></div>
+</div>
+{% elif my_pending %}
+<div class="card"><span class="name">{{ my_pending }} of your photos {{ "is" if my_pending == 1 else "are" }} waiting for Grandma's OK</span></div>
+{% endif %}
+<div class="row2">
+  <a class="btn secondary" href="/photos/add">Add photos</a>
+  <a class="btn secondary" href="/photos">Photos</a>
+</div>
+{% if missing %}
+<a class="card" href="/people" style="text-decoration: none; color: inherit">
+  <span class="name">{{ missing | length }} {{ "person needs" if missing | length == 1 else "people need" }} a birthday</span>
+  <span class="muted small">{{ missing | map(attribute="name") | join(", ") }}</span>
+</a>
+{% endif %}
+<section class="list" aria-labelledby="coming">
+  <h2 id="coming">Coming up <span class="muted small" style="font-weight: 400">· next 60 days</span></h2>
+  {% for c in upcoming %}
+  <div class="item">
+    <span class="avatar">{{ c.initial }}</span>
+    <span class="grow"><span class="name">{{ c.name }}</span><span class="muted small">{{ c.detail }}</span></span>
+    <span class="right">{{ short_date(c.when) }}<br><span class="muted small">{{ how_far(c.days_away) }}</span></span>
+  </div>
+  {% else %}
+  <p class="muted">Nothing in the next 60 days.{% if people_count <= 1 %} Add someone's birthday and it shows up here.{% endif %}</p>
+  {% endfor %}
+</section>
+{% if trusted_owner %}<a class="btn quiet" href="/settings/date">Testing: date and photo timing</a>{% endif %}
+{% endblock %}
