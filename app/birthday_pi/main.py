@@ -209,6 +209,7 @@ def _form_values(conn: sqlite3.Connection, person: sqlite3.Row | None) -> dict:
 
 
 MAX_ANNIVERSARY_ROWS = 20
+FUTURE_YEARS = 10  # anniversaries may be dated up to this many years ahead
 
 
 def _parse_person_form(form) -> tuple[dict, dict, dict]:
@@ -231,15 +232,15 @@ def _parse_person_form(form) -> tuple[dict, dict, dict]:
             errors[key] = "Please use numbers only."
             return None
 
-    def date_parts(prefix):
+    def date_parts(prefix, max_year):
         month, day, year = to_int(f"{prefix}_month"), to_int(f"{prefix}_day"), to_int(f"{prefix}_year")
         day_key = f"{prefix}_day"
         if (month is None) != (day is None):
             errors[day_key] = "Please pick both the month and the day."
         elif month is not None and not valid_month_day(month, day):
             errors[day_key] = f"{MONTHS[month - 1] if 1 <= month <= 12 else 'That month'} doesn't have a day {day}."
-        if year is not None and not 1900 <= year <= this_year:
-            errors[f"{prefix}_year"] = f"Please use a year between 1900 and {this_year}."
+        if year is not None and not 1900 <= year <= max_year:
+            errors[f"{prefix}_year"] = f"Please use a year between 1900 and {max_year}."
         if year is not None and month is None:
             errors[day_key] = "Please pick the month and day too."
         return month, day, year
@@ -249,11 +250,11 @@ def _parse_person_form(form) -> tuple[dict, dict, dict]:
         errors["name"] = "Please type a name."
     elif len(values["name"]) > 40:
         errors["name"] = "Please use 40 letters or fewer."
-    clean["birth_month"], clean["birth_day"], clean["birth_year"] = date_parts("birth")
+    clean["birth_month"], clean["birth_day"], clean["birth_year"] = date_parts("birth", this_year)
 
     for i in range(count):
         prefix = f"ann_{i}"
-        month, day, year = date_parts(prefix)
+        month, day, year = date_parts(prefix, this_year + FUTURE_YEARS)  # e.g. a graduation next year
         if month is None and day is None and year is None:
             continue  # a blank row, or one cleared to remove it
         kind = values[f"{prefix}_kind"]

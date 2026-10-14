@@ -68,8 +68,13 @@ def upcoming(conn: sqlite3.Connection, today: date, within_days: int | None = No
     rows = conn.execute("SELECT a.*, p.name FROM anniversaries a JOIN people p ON p.id = a.person_id")
     for a in rows:
         when = next_occurrence(a["month"], a["day"], today)
-        detail = f"{ANNIVERSARY_TYPES.get(a['kind'], a['kind'].title())} anniversary"
-        if a["year"] and when.year > a["year"]:
+        if a["year"] and when.year < a["year"]:
+            when = occurrence(a["month"], a["day"], a["year"])  # a future date: nothing to celebrate before it
+        label = ANNIVERSARY_TYPES.get(a["kind"], a["kind"].title())
+        detail = f"{label} anniversary"
+        if a["year"] and when.year == a["year"]:
+            detail = f"{label} day"
+        elif a["year"]:
             n = when.year - a["year"]
             detail += f" · {n} year{'s' if n != 1 else ''}"
         items.append(Celebration("anniversary", a["name"], when, (when - today).days, detail, a["name"][:1].upper()))

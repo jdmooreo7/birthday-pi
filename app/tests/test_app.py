@@ -145,3 +145,27 @@ def test_load_sample_only_on_fresh_pi(client, capsys):
     assert conn.execute("SELECT COUNT(*) FROM people").fetchone()[0] == 9
     assert conn.execute("SELECT COUNT(*) FROM anniversaries").fetchone()[0] == 2
     assert "Aunt Rosa" in client.get("/screen/content").text
+
+
+def test_anniversary_can_be_in_the_future(set_up, monkeypatch):
+    from birthday_pi import main
+    monkeypatch.setattr(main, "today", lambda: date(2026, 10, 14))
+    client = set_up
+    r = client.post("/people/new", data={"name": "Leo", "ann_count": "1", "ann_0_kind": "graduation",
+                                         "ann_0_month": "6", "ann_0_day": "1", "ann_0_year": "2028"},
+                    follow_redirects=False)
+    assert r.status_code == 303
+    r = client.post("/people/new", data={"name": "Mia", "birth_month": "1", "birth_day": "1", "birth_year": "2028"})
+    assert r.status_code == 400 and "between 1900 and 2026" in r.text  # birthdays stay in the past
+
+
+def test_future_anniversary_first_shows_on_the_day(tmp_path, monkeypatch):
+    from birthday_pi.dates import upcoming
+    monkeypatch.setenv("BIRTHDAY_PI_DATA", str(tmp_path))
+    conn = db.connect()
+    pid = conn.execute("INSERT INTO people (name) VALUES ('Leo')").lastrowid
+    conn.execute("INSERT INTO anniversaries (person_id, kind, month, day, year) VALUES (?, 'graduation', 6, 1, 2028)", (pid,))
+    assert upcoming(conn, date(2027, 5, 20))[0].when == date(2028, 6, 1)  # not June 2027
+    c = upcoming(conn, date(2028, 5, 20))[0]
+    assert c.when == date(2028, 6, 1) and c.detail == "Graduation day"
+    assert upcoming(conn, date(2029, 5, 20))[0].detail == "Graduation anniversary · 1 year"

@@ -34,3 +34,4 @@ Decisions made by the Product Owner, newest last. The storyboard (`birthday_pi_s
 | 2026-10-14 | The Product Owner runs a short usability check at the end of every milestone, starting with M1 (M0's skeleton is built as part of M1). |
 | 2026-10-14 | "Coming up" (phone and monitor) only lists celebrations in the next 60 days. |
 | 2026-10-14 | An anniversary belongs to one person and has a type, starting with Wedding and Graduation. No "with" partner. A person can have more than one. |
+| 2026-10-14 | Anniversaries can be dated up to 10 years ahead (e.g. a graduation in 2028); one shows as "Graduation day" on the date itself and as an anniversary afterwards. Birthdays stay in the past. |
