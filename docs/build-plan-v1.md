@@ -56,6 +56,10 @@ Reminders depend on the date, so waiting two weeks to test the card reminder isn
 - **When:** the Product Owner runs a short usability check at the end of every milestone (M1 to M4), then the full test after v0.1. Tests start with the sample family.
 - **How:** watch the first session in person; after that, a short check-in each week. The app keeps a simple local log of "Got it" times, which tells us how quickly reminders get noticed. It stays on the Pi.
 
+## Backlog (after v0.1)
+- Family tree that fills in as birthdays are added (`features/family-tree-progress.md`).
+- Integrations, phone alerts and text-message approval links (see `features/`).
+
 ## Risks
 - **iPhone HEIC support on ARM** may need extra packages in the image. Check this in M0.
 - **Chromium memory on a 4 GB Pi** over many days. The M4 soak test covers this.
