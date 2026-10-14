@@ -17,3 +17,10 @@ Decisions made by the Product Owner, newest last. The storyboard (`birthday_pi_s
 | 2026-10-13 | Tagging "who's in this photo" by hand is an acceptable fallback when face recognition misses or is wrong. Hand-tagged faces count as verified. |
 | 2026-10-13 | Pets detected as faces are handled with a "Not a person" button on the "Who is this?" card, plus the 3-photo rule. No automatic pet filter in v1. Pets with birthdays are a future idea (`features/pets-as-family.md`). |
 | 2026-10-13 | A one-command `setup.sh` (installs git and Docker, adds the user to the docker group, clones and starts the app) is parked on the backlog. For now the README documents the prerequisites step by step. |
+| 2026-10-14 | Anyone in the home can add photos. A photo is only displayed after Grandma approves it. |
+| 2026-10-14 | The monitor is the main screen. Any browser on the home Wi-Fi (e.g. Grandma's phone or tablet) can open the same display. |
+| 2026-10-14 | No "upcoming" photo window: photos follow the slideshow rules above (all photos, or only the celebrated person's on their day). Storyboard updated. |
+| 2026-10-14 | Reminder text grows daily up to a maximum size; the growth curve is a design call. Two or more active reminders stack vertically, soonest celebration on top. |
+| 2026-10-14 | Integrations are not in v1. They're a future feature (`features/integrations.md`). |
+| 2026-10-14 | Grandma can approve photos on the monitor and on her phone or tablet browser. A text message with an approval link is a future feature (`features/photo-approval-text-notification.md`). |
+| 2026-10-14 | v1 protects photo approval with a 4-digit PIN. |
