@@ -2,7 +2,7 @@
 
 A small, local-only family reminder screen for a Raspberry Pi 5. It runs in Docker on your home network and shows birthdays and reminders on a monitor.
 
-> **Status: early (milestone 1 of the first test release).** Birthday Pi can be set up from a phone, Grandma has a PIN, and the family can add people, birthdays and anniversaries, which show on the monitor. Reminders and photos come in the next milestones ([build plan](docs/build-plan-v1.md)). See [`docs/birthday_pi_storyboard.html`](docs/birthday_pi_storyboard.html) for the plan and [`docs/product-decisions.md`](docs/product-decisions.md) for decisions so far.
+> **Status: early (milestone 3 of the first test release).** Birthday Pi can be set up from a phone, Grandma has a PIN, and the family can add people, birthdays and anniversaries. The monitor shows what's coming up and gift, card and call reminders, and family photos (approved by Grandma) cycle when it's idle. See the [build plan](docs/build-plan-v1.md). See [`docs/birthday_pi_storyboard.html`](docs/birthday_pi_storyboard.html) for the plan and [`docs/product-decisions.md`](docs/product-decisions.md) for decisions so far.
 >
 > Tested on a Raspberry Pi 5 (4 GB) with Raspberry Pi OS 64-bit (Debian 13 "trixie"), Docker 29 and Compose v5. Not yet tested starting from a blank SD card, so tell us if a step is missing (open an issue).
 
@@ -149,7 +149,7 @@ Run these from `~/birthday-pi`:
 
 ## Your photos stay yours
 
-Names, dates and (later) photos are kept in a Docker volume on the Pi, never in this repo. Real family photos and face data are never committed (see `.gitignore`).
+Names, dates and photos are kept in a Docker volume on the Pi, never in this repo. Photos are resized to screen size when they're added, and location and camera details are removed. Real family photos and face data are never committed (see `.gitignore`).
 
 ## License
 

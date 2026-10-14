@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Approve photos</title>
+<link rel="stylesheet" href="{{ static_url('fonts.css') }}">
+<link rel="stylesheet" href="{{ static_url('screen.css') }}">
+</head>
+<body>
+<div class="approve">
+  <div class="approve-top">
+    <div>
+      <h1>Show these on the screen?</h1>
+      <div class="mid">{{ waiting | length }} new photo{{ "" if waiting | length == 1 else "s" }} waiting</div>
+    </div>
+    <form method="post" action="/screen/approve/done"><button type="submit" class="ghost">Done</button></form>
+  </div>
+  <div class="approve-grid">
+    {% for ph in waiting %}
+    <div class="approve-card">
+      <img src="/photo-files/{{ ph.id }}.jpg" alt="Photo added by {{ ph.uploader or 'someone' }}">
+      <div class="mid">Added by {{ ph.uploader or "someone" }}</div>
+      <form method="post" action="/screen/approve/decide" class="approve-buttons">
+        <input type="hidden" name="photo_id" value="{{ ph.id }}">
+        <button type="submit" name="action" value="approve" class="yes">Yes, show it</button>
+        <button type="submit" name="action" value="reject" class="ghost">No</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+<script>
+  // Back to the main screen (and locked again) after 3 minutes without input.
+  (function () {
+    let t;
+    function reset() { clearTimeout(t); t = setTimeout(() => document.querySelector("form[action='/screen/approve/done']").submit(), 3 * 60 * 1000); }
+    ["mousemove", "mousedown", "touchstart", "wheel"].forEach(e => window.addEventListener(e, reset, { passive: true }));
+    reset();
+  })();
+</script>
+</body>
+</html>

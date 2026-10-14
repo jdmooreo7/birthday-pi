@@ -38,3 +38,5 @@ Decisions made by the Product Owner, newest last. The storyboard (`birthday_pi_s
 | 2026-10-14 | Reminder text sizes on the 1080p monitor: the gift reminder starts at 64 px, the card reminder at 96 px, and both grow 16 px a day to 160 px; the call reminder is 160 px on the day. Stacked cards are capped at 112 px (2 cards) or 88 px (3); at most 3 show, with "+N more on your phone". |
 | 2026-10-14 | When a reminder stage is acknowledged, the next stage still comes (e.g. "Got it" on the gift reminder, then the card reminder at 1 week). |
 | 2026-10-14 | Backlog: a "family tree that fills in" screen on Grandma's phone that shows missing birthdays at a glance (`features/family-tree-progress.md`). |
+| 2026-10-14 | Photos are stored at screen size (originals not kept) with location and camera details removed. "No" on a waiting photo deletes it from the Pi. Up to 50 photos per upload, 25 MB each; uploads stop when the SD card has under 2 GB free. |
+| 2026-10-14 | On the monitor, Grandma's PIN unlocks photo approval for 10 minutes or until she taps Done. |

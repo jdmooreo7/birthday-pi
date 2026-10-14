@@ -1,17 +1,20 @@
 """Birthday Pi web app: the monitor screen (/screen) and the phone pages (everything else)."""
 import hashlib
 import os
+import re
+import secrets
 import sqlite3
+import time
 from datetime import date, datetime
 from pathlib import Path
 
 import segno
 from fastapi import Depends, FastAPI, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import db, devices, pins, reminders
+from . import db, devices, photos, pins, reminders
 from .dates import ANNIVERSARY_TYPES, MONTHS, how_far, missing_birthdays, short_date, upcoming, valid_month_day
 
 HERE = Path(__file__).parent
@@ -186,6 +189,9 @@ def home(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
         request, "home.html", device=device, today=now, reminders=reminders.active(conn, now),
         upcoming=upcoming(conn, now, within_days=COMING_UP_DAYS), missing=missing_birthdays(conn),
         people_count=people_count, trusted_owner=devices.is_trusted_owner(device),
+        pending=photos.pending_count(conn),
+        my_pending=conn.execute("SELECT COUNT(*) FROM photos WHERE status = 'pending' AND uploader_id = ?",
+                                (device["person_id"],)).fetchone()[0],
     )
 
 
@@ -416,6 +422,197 @@ def person_remove(person_id: int, request: Request, conn: sqlite3.Connection = D
     return RedirectResponse("/people", status_code=303)
 
 
+# ---------- Photos (phone) ----------
+
+@app.get("/photos")
+def photo_list(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    device = require_device(conn, request)
+    trusted = devices.is_trusted_owner(device)
+    if trusted:
+        sections = [
+            ("Waiting for your OK", photos.listing(conn, "status = 'pending'")),
+            ("On the screen", photos.listing(conn, "status = 'approved' AND hidden = 0")),
+            ("Hidden", photos.listing(conn, "status = 'approved' AND hidden = 1")),
+        ]
+    else:
+        sections = [
+            ("Your photos waiting for Grandma", photos.listing(conn, "status = 'pending' AND uploader_id = ?",
+                                                               (device["person_id"],))),
+            ("On the screen", photos.listing(conn, "status = 'approved' AND hidden = 0")),
+        ]
+    return page(request, "photos.html", device=device, sections=sections, trusted_owner=trusted,
+                pending=photos.pending_count(conn))
+
+
+@app.get("/photos/add")
+def photo_add_form(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    device = require_device(conn, request)
+    return page(request, "photo_add.html", device=device, trusted_owner=devices.is_trusted_owner(device))
+
+
+@app.post("/photos/add")
+async def photo_add(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    device = require_device(conn, request)
+    trusted = devices.is_trusted_owner(device)
+    form = await request.form(max_files=photos.MAX_FILES_PER_UPLOAD)
+    added, duplicates, problems = [], 0, []
+    for upload in form.getlist("photos"):
+        if not hasattr(upload, "read"):
+            continue
+        data = await upload.read()
+        if not data:
+            continue
+        try:
+            photo_id = photos.save_upload(conn, data, device["person_id"], approved=trusted)
+        except photos.UploadError as e:
+            problems.append(f"{upload.filename or 'A photo'} {e}.")
+            continue
+        if photo_id:
+            added.append(photo_id)
+        else:
+            duplicates += 1
+    return page(request, "photo_added.html", device=device, trusted_owner=trusted,
+                added=[photos.get(conn, i) for i in added], duplicates=duplicates, problems=problems)
+
+
+@app.get("/photos/review")
+def photo_review(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    device = require_trusted_owner(conn, request)
+    return page(request, "photo_review.html", device=device, waiting=photos.listing(conn, "status = 'pending'"))
+
+
+def _get_photo(conn: sqlite3.Connection, photo_id: str) -> sqlite3.Row:
+    photo = photos.get(conn, photo_id)
+    if photo is None:
+        raise RedirectTo("/photos")
+    return photo
+
+
+@app.get("/photos/{photo_id}")
+def photo_detail(photo_id: str, request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    device = require_device(conn, request)
+    photo = _get_photo(conn, photo_id)
+    people = conn.execute("SELECT id, name FROM people ORDER BY is_owner DESC, name").fetchall()
+    return page(request, "photo_detail.html", device=device, photo=photo, people=people,
+                tagged=photos.tags(conn, photo_id), trusted_owner=devices.is_trusted_owner(device),
+                saved=request.query_params.get("saved") == "1")
+
+
+@app.post("/photos/{photo_id}/tags")
+async def photo_tags(photo_id: str, request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    require_device(conn, request)
+    _get_photo(conn, photo_id)
+    form = await request.form()
+    ids = set()
+    for v in form.getlist("person"):
+        try:
+            ids.add(int(v))
+        except ValueError:
+            pass
+    photos.set_tags(conn, photo_id, ids)
+    return RedirectResponse(f"/photos/{photo_id}?saved=1", status_code=303)
+
+
+def _decide(conn: sqlite3.Connection, photo_id: str, action: str) -> None:
+    photo = photos.get(conn, photo_id)
+    if photo is None:
+        return
+    if action == "approve" and photo["status"] == "pending":
+        conn.execute("UPDATE photos SET status = 'approved' WHERE id = ?", (photo_id,))
+    elif action == "reject" and photo["status"] == "pending":
+        photos.delete(conn, photo_id)  # "No" means it never goes on the screen; the file is removed
+    elif action == "hide":
+        conn.execute("UPDATE photos SET hidden = 1 WHERE id = ?", (photo_id,))
+    elif action == "show":
+        conn.execute("UPDATE photos SET hidden = 0 WHERE id = ?", (photo_id,))
+
+
+@app.post("/photos/{photo_id}/decision")
+async def photo_decision(photo_id: str, request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    require_trusted_owner(conn, request)
+    form = await request.form()
+    _decide(conn, photo_id, str(form.get("action", "")))
+    back = str(form.get("back", ""))
+    return RedirectResponse(back if back in ("/photos/review", "/photos") else "/photos", status_code=303)
+
+
+@app.get("/photo-files/{name}")
+def photo_file(name: str):
+    """Photo ids are random, so only someone shown the page knows a photo's address."""
+    m = re.fullmatch(r"([0-9a-f]{16})(-thumb)?\.jpg", name)
+    path = photos.file_path(m.group(1), bool(m.group(2))) if m else None
+    if path is None or not path.exists():
+        return Response(status_code=404)
+    return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=86400"})
+
+
+# ---------- Monitor: Grandma approves photos with her PIN ----------
+
+SCREEN_COOKIE = "bp_screen"
+SCREEN_UNLOCK_SECONDS = 10 * 60
+
+
+def _screen_unlocked(conn: sqlite3.Connection, request: Request) -> bool:
+    token = request.cookies.get(SCREEN_COOKIE)
+    stored = db.get_setting(conn, "screen_unlock")
+    if not token or not stored:
+        return False
+    digest, until = stored.split("|")
+    return hashlib.sha256(token.encode()).hexdigest() == digest and time.time() < float(until)
+
+
+@app.get("/screen/approve")
+def screen_approve(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    require_setup(conn)
+    waiting = photos.listing(conn, "status = 'pending'")
+    if not waiting:
+        return RedirectResponse("/screen", status_code=303)
+    if not _screen_unlocked(conn, request):
+        return page(request, "screen_pin.html", owner=db.owner(conn), waiting=waiting, error=None,
+                    locked=pins.seconds_locked(conn))
+    return page(request, "screen_approve.html", waiting=waiting)
+
+
+@app.post("/screen/approve/pin")
+async def screen_approve_pin(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    require_setup(conn)
+    form = await request.form()
+    if pins.check_pin(conn, str(form.get("pin", ""))) == "ok":
+        token = secrets.token_urlsafe(32)
+        db.set_setting(conn, "screen_unlock",
+                       f"{hashlib.sha256(token.encode()).hexdigest()}|{time.time() + SCREEN_UNLOCK_SECONDS}")
+        response = RedirectResponse("/screen/approve", status_code=303)
+        response.set_cookie(SCREEN_COOKIE, token, max_age=SCREEN_UNLOCK_SECONDS, httponly=True, samesite="lax")
+        return response
+    locked = pins.seconds_locked(conn)
+    return page(request, "screen_pin.html", 400, owner=db.owner(conn), waiting=photos.listing(conn, "status = 'pending'"),
+                error=None if locked else "That PIN isn't right. Please try again.", locked=locked)
+
+
+@app.post("/screen/approve/decide")
+async def screen_approve_decide(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    if _screen_unlocked(conn, request):
+        form = await request.form()
+        if form.get("action") in ("approve", "reject"):
+            _decide(conn, str(form.get("photo_id", "")), str(form.get("action")))
+    return RedirectResponse("/screen/approve", status_code=303)
+
+
+@app.post("/screen/approve/done")
+def screen_approve_done(conn: sqlite3.Connection = Depends(get_conn)):
+    conn.execute("DELETE FROM settings WHERE key = 'screen_unlock'")
+    response = RedirectResponse("/screen", status_code=303)
+    response.delete_cookie(SCREEN_COOKIE)
+    return response
+
+
+@app.get("/screen/photos")
+def screen_photos(conn: sqlite3.Connection = Depends(get_conn)) -> JSONResponse:
+    if not db.is_set_up(conn):
+        return JSONResponse({"photos": [], "title": ""})
+    return JSONResponse(photos.slideshow(conn, today(conn)))
+
+
 # ---------- Monitor ----------
 
 def _screen_context(conn: sqlite3.Connection) -> dict:
@@ -427,7 +624,7 @@ def _screen_context(conn: sqlite3.Connection) -> dict:
     active = reminders.active(conn, now)
     shown = list(zip(active, reminders.monitor_sizes(active)))
     return {"mode": "home", "today": now, "upcoming": upcoming(conn, now, within_days=COMING_UP_DAYS, limit=4),
-            "missing_count": len(missing_birthdays(conn)), "now": datetime.now(),
+            "missing_count": len(missing_birthdays(conn)), "now": datetime.now(), "pending": photos.pending_count(conn),
             "phone_url": PUBLIC_URL.split("://", 1)[-1], "reminders": shown,
             "more_reminders": len(active) - len(shown), "reminder_keys": " ".join(r.key for r in active),
             # With one reminder showing, "Next:" lists what comes after it.

@@ -32,6 +32,24 @@ CREATE TABLE IF NOT EXISTS reminder_acks (
     person_id INTEGER REFERENCES people(id) ON DELETE SET NULL,
     acked_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+-- Family photos. Files live in <data>/photos as <id>.jpg and <id>-thumb.jpg.
+CREATE TABLE IF NOT EXISTS photos (
+    id          TEXT PRIMARY KEY,
+    sha256      TEXT NOT NULL UNIQUE,
+    uploader_id INTEGER REFERENCES people(id) ON DELETE SET NULL,
+    status      TEXT NOT NULL,  -- 'pending' (waiting for Grandma) or 'approved'
+    hidden      INTEGER NOT NULL DEFAULT 0,
+    width       INTEGER,
+    height      INTEGER,
+    taken_at    TEXT,
+    created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+-- Who's in each photo, tagged by hand.
+CREATE TABLE IF NOT EXISTS photo_people (
+    photo_id  TEXT NOT NULL REFERENCES photos(id) ON DELETE CASCADE,
+    person_id INTEGER NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+    PRIMARY KEY (photo_id, person_id)
+);
 -- A phone or tablet that picked "who's using this". Only a hash of its cookie is stored.
 CREATE TABLE IF NOT EXISTS devices (
     token_hash    TEXT PRIMARY KEY,

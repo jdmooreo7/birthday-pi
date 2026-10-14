@@ -70,10 +70,35 @@ def load_sample(args) -> int:
         month, day = soon(days)
         conn.execute("INSERT INTO anniversaries (person_id, kind, month, day, year) VALUES (?, ?, ?, ?, ?)",
                      (ids[name], kind, month, day, year))
+    n_photos = _sample_photos(conn, ids)
     pins.set_pin(conn, pin)
     db.set_setting(conn, "setup_complete", "1")
-    print(f"Sample family loaded: {len(people)} people. Grandma's PIN is {pin}.")
+    print(f"Sample family loaded: {len(people)} people, {n_photos} drawn photos. Grandma's PIN is {pin}.")
     return 0
+
+
+def _sample_photos(conn, ids: dict[str, int]) -> int:
+    """Simple drawn "photos" with names on them, tagged, so the slideshow has something to show."""
+    import io
+
+    from PIL import Image, ImageDraw, ImageFont
+
+    from . import photos
+
+    colours = ["#56697d", "#6b5d7d", "#5d7a6b", "#7d6a56", "#7d5660"]
+    groups = [["Aunt Rosa"], ["Aunt Rosa", "Grandma"], ["Leo"], ["Leo", "Mia"], ["Mia"],
+              ["Dana", "Sam"], ["Grandpa Joe", "Grandma"], ["Uncle Ben"]]
+    font = ImageFont.load_default(size=110)
+    for i, names in enumerate(groups):
+        img = Image.new("RGB", (1600, 1000), colours[i % len(colours)])
+        draw = ImageDraw.Draw(img)
+        draw.text((800, 450), " & ".join(names), font=font, fill="#fdf6ec", anchor="mm")
+        draw.text((800, 600), "sample photo", font=ImageFont.load_default(size=50), fill="#d9d2e6", anchor="mm")
+        buf = io.BytesIO()
+        img.save(buf, "JPEG", quality=85)
+        photo_id = photos.save_upload(conn, buf.getvalue(), ids["Grandma"], approved=True)
+        photos.set_tags(conn, photo_id, {ids[n] for n in names})
+    return len(groups)
 
 
 def main(argv: list[str] | None = None) -> int:

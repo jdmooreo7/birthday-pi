@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Photo{% endblock %}
+{% block content %}
+<img class="photo" src="/photo-files/{{ photo.id }}.jpg" alt="Photo added by {{ photo.uploader or 'someone' }}">
+<p class="muted small">Added by {{ photo.uploader or "someone" }}{% if photo.status == "pending" %} · waiting for Grandma's OK{% elif photo.hidden %} · hidden from the screen{% endif %}</p>
+{% if trusted_owner %}
+  {% if photo.status == "pending" %}
+  <form method="post" action="/photos/{{ photo.id }}/decision" class="row2">
+    <input type="hidden" name="back" value="/photos">
+    <button class="btn" type="submit" name="action" value="approve">Yes, show it</button>
+    <button class="btn secondary" type="submit" name="action" value="reject">No</button>
+  </form>
+  {% else %}
+  <form method="post" action="/photos/{{ photo.id }}/decision">
+    <input type="hidden" name="back" value="/photos">
+    {% if photo.hidden %}<button class="btn" type="submit" name="action" value="show">Show on the screen again</button>
+    {% else %}<button class="btn secondary" type="submit" name="action" value="hide">Hide from the screen</button>
+    <p class="muted small">Hidden photos stay on the Pi. You can show them again any time.</p>{% endif %}
+  </form>
+  {% endif %}
+{% endif %}
+<form method="post" action="/photos/{{ photo.id }}/tags">
+  <fieldset>
+    <legend>Who's in this photo?</legend>
+    {% if saved %}<div class="notice" role="status">Saved.</div>{% endif %}
+    <div class="checks">
+      {% for p in people %}
+      <label class="check"><input type="checkbox" name="person" value="{{ p.id }}"{% if p.id in tagged %} checked{% endif %}> {{ p.name }}</label>
+      {% endfor %}
+    </div>
+  </fieldset>
+  <button class="btn secondary" type="submit">Save who's in it</button>
+</form>
+<a class="btn quiet" href="/photos">All photos</a>
+{% endblock %}

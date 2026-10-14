@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Photos added{% endblock %}
+{% block content %}
+<h1>{% if added %}{{ added | length }} photo{{ "" if added | length == 1 else "s" }} added{% else %}No new photos{% endif %}</h1>
+{% if added %}
+<p>{% if trusted_owner %}They're on the screen now.{% else %}They'll show on the screen after Grandma says OK.{% endif %}
+  Tap a photo to say who's in it. On someone's birthday, the screen shows only their photos.</p>
+<div class="thumbs">
+  {% for ph in added %}<a href="/photos/{{ ph.id }}"><img src="/photo-files/{{ ph.id }}-thumb.jpg" alt="New photo {{ loop.index }}"></a>{% endfor %}
+</div>
+{% endif %}
+{% if duplicates %}<p class="muted">{{ duplicates }} {{ "was" if duplicates == 1 else "were" }} already on the Pi, so {{ "it was" if duplicates == 1 else "they were" }} skipped.</p>{% endif %}
+{% for p in problems %}<p class="error">{{ p }}</p>{% endfor %}
+<div class="row2">
+  <a class="btn" href="/photos/add">Add more</a>
+  <a class="btn secondary" href="/">Done</a>
+</div>
+{% endblock %}

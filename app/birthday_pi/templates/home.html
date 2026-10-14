@@ -24,6 +24,18 @@
   <a class="btn secondary" href="/people">Everyone</a>
 </div>
 {% endif %}
+{% if pending and trusted_owner %}
+<div class="card">
+  <div class="top"><span class="name">{{ pending }} photo{{ "" if pending == 1 else "s" }} need{{ "s" if pending == 1 else "" }} your OK</span>
+  <a class="btn secondary" style="width: auto; min-height: 48px" href="/photos/review">Review</a></div>
+</div>
+{% elif my_pending %}
+<div class="card"><span class="name">{{ my_pending }} of your photos {{ "is" if my_pending == 1 else "are" }} waiting for Grandma's OK</span></div>
+{% endif %}
+<div class="row2">
+  <a class="btn secondary" href="/photos/add">Add photos</a>
+  <a class="btn secondary" href="/photos">Photos</a>
+</div>
 {% if missing %}
 <a class="card" href="/people" style="text-decoration: none; color: inherit">
   <span class="name">{{ missing | length }} {{ "person needs" if missing | length == 1 else "people need" }} a birthday</span>

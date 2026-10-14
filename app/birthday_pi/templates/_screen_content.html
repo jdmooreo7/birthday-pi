@@ -38,6 +38,7 @@
     </form>
   </div>
   {% endfor %}
+  {% if pending %}<div class="next"><a class="look" href="/screen/approve">{{ pending }} new photo{{ "" if pending == 1 else "s" }} for Grandma's OK · Look</a></div>{% endif %}
   {% if more_reminders %}<div class="more">+ {{ more_reminders }} more on your phone</div>
   {% elif reminders | length == 1 and next_up %}
   <div class="next"><b>Next:</b> {% for c in next_up %}{{ c.name }} · {{ short_date(c.when) }}{% if not loop.last %} &nbsp;·&nbsp; {% endif %}{% endfor %}</div>
@@ -65,7 +66,8 @@
   </div>
   <div class="status">
     <span>{% if missing_count %}{{ missing_count }} {{ "person still needs" if missing_count == 1 else "people still need" }} a birthday{% endif %}</span>
-    <span>Add birthdays from a phone: {{ phone_url }}</span>
+    {% if pending %}<a class="look" href="/screen/approve">{{ pending }} new photo{{ "" if pending == 1 else "s" }} for Grandma's OK · Look</a>
+    {% else %}<span>Add birthdays from a phone: {{ phone_url }}</span>{% endif %}
   </div>
 </div>
 {% endif %}

@@ -63,3 +63,11 @@ input:focus, select:focus, .btn:focus-visible, .choice:focus-visible, a:focus-vi
 .reminder .ack { flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; }
 .btn.dark { background: var(--ink); border-color: var(--ink); color: var(--bg); width: auto; min-height: 48px; padding: 0 24px; }
 .btn.dark:hover { background: #000; border-color: #000; }
+.thumbs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+.thumbs a { display: block; aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: var(--line); }
+.thumbs img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo { width: 100%; height: auto; border-radius: 14px; display: block; background: var(--line); }
+.checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.check { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 12px; margin: 0;
+  border: 2px solid var(--line); border-radius: 12px; background: var(--card); font-weight: 400; cursor: pointer; }
+.check input { width: 24px; height: 24px; min-height: 0; margin: 0; accent-color: var(--accent); }

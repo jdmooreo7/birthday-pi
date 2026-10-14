@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grandma's PIN</title>
+<link rel="stylesheet" href="{{ static_url('fonts.css') }}">
+<link rel="stylesheet" href="{{ static_url('screen.css') }}">
+</head>
+<body>
+<div class="pinpage">
+  <div class="pintext">
+    <div class="mid">{{ waiting | length }} new photo{{ "" if waiting | length == 1 else "s" }}{% if waiting[0].uploader %} from {{ waiting[0].uploader }}{% endif %}</div>
+    <h1>{{ owner.name }}, enter your PIN</h1>
+    <div class="mid">Only you can choose which photos go on the screen.</div>
+    <div class="dots" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+    {% if locked %}<div class="pinerror" role="alert">Too many tries. Please wait {{ locked }} seconds.</div>
+    {% elif error %}<div class="pinerror" role="alert">{{ error }}</div>{% endif %}
+  </div>
+  <form method="post" action="/screen/approve/pin" class="pinpad" id="pinform">
+    <input type="hidden" name="pin" id="pin">
+    <div class="keys">
+      {% for d in ["1","2","3","4","5","6","7","8","9"] %}<button type="button" data-digit="{{ d }}">{{ d }}</button>{% endfor %}
+      <span></span><button type="button" data-digit="0">0</button><button type="button" data-delete aria-label="Delete last digit">⌫</button>
+    </div>
+    <a class="notnow" href="/screen">Not now</a>
+  </form>
+</div>
+<script src="{{ static_url('pinpad.js') }}"></script>
+</body>
+</html>

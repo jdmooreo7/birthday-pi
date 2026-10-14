@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Add photos{% endblock %}
+{% block content %}
+<h1>Add family photos</h1>
+<p>Pick photos with the family in them. Group shots are great. You can choose up to 50 at a time.</p>
+<form method="post" action="/photos/add" enctype="multipart/form-data">
+  <div class="field">
+    <label for="photos">Photos</label>
+    <input id="photos" name="photos" type="file" accept="image/*,.heic,.heif" multiple required>
+  </div>
+  {% if not trusted_owner %}<div class="notice">These photos show on the screen after Grandma says OK.</div>{% endif %}
+  <button class="btn" type="submit">Add photos</button>
+</form>
+<p class="muted small">Photos stay on this Pi. Nothing is sent to the internet. Location and camera details are removed.</p>
+<a class="btn quiet" href="/photos">Back</a>
+{% endblock %}

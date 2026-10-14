@@ -7,7 +7,9 @@
   const [NIGHT_START, NIGHT_END] = (params.get("night") || "22-5").split("-").map(Number);
   const CURSOR_MS = 5000;
   const REFRESH_MS = 10 * 1000;
+  const PHOTO_MS = (Number(params.get("photo")) || 60) * 1000;  // each photo stays up 1 minute
   let lastActive = Date.now();
+  let photoList = [], photoIdx = -1, photoTimer = null, front = 0, celebrating = "";
 
   function wake() { lastActive = Date.now(); tick(); }
   ["mousemove", "mousedown", "touchstart", "keydown", "wheel"].forEach(e =>
@@ -25,6 +27,35 @@
     if (clock) clock.textContent = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     document.body.classList.toggle("idle-cursor", idle >= CURSOR_MS);
     document.body.classList.toggle("night", idle >= IDLE_MS && isNight(now));
+    const photoClock = document.getElementById("photo-clock");
+    if (photoClock) photoClock.textContent = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    const cl = document.body.classList;
+    const showPhotos = idle >= IDLE_MS && photoList.length > 0;
+    if (showPhotos && !cl.contains("photos")) { cl.add("photos"); nextPhoto(); photoTimer = setInterval(nextPhoto, PHOTO_MS); }
+    if (!showPhotos && cl.contains("photos")) { cl.remove("photos"); clearInterval(photoTimer); }
+  }
+
+  // Slideshow: approved photos, or only the celebrated person's photos on their day.
+  function nextPhoto() {
+    if (!photoList.length) return;
+    photoIdx = (photoIdx + 1) % photoList.length;
+    const imgs = document.querySelectorAll("#photos img");
+    const next = imgs[1 - front];
+    next.onload = () => { next.classList.add("show"); imgs[front].classList.remove("show"); front = 1 - front; };
+    next.src = photoList[photoIdx];
+  }
+
+  async function loadPhotos() {
+    try {
+      const data = await (await fetch("/screen/photos", { cache: "no-store" })).json();
+      const changed = [...data.photos].sort().join() !== [...photoList].sort().join() || data.title !== celebrating;
+      if (!changed) return;
+      celebrating = data.title;
+      photoList = data.photos.sort(() => Math.random() - 0.5);
+      photoIdx = -1;
+      const title = document.getElementById("photo-title");
+      title.textContent = celebrating;
+    } catch (e) { /* keep the current photos */ }
   }
 
   function reminderKeys() {
@@ -55,4 +86,6 @@
   tick();
   setInterval(tick, 1000);
   setInterval(refresh, REFRESH_MS);
+  loadPhotos();
+  setInterval(loadPhotos, 60 * 1000);
 })();
