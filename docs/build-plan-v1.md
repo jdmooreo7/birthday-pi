@@ -63,4 +63,4 @@ Reminders depend on the date, so waiting two weeks to test the card reminder isn
 - **Family photos of children.** Get the family's OK before testing with real photos.
 
 ## Questions for the Product Owner
-1. Who are the test participants (the family members who will try it), and will the test run on the current Pi or a second one at Grandma's home?
+1. ~~Who are the test participants?~~ For milestone checks the Product Owner plays Grandma, and other devices (e.g. the Mac) play other family members.
