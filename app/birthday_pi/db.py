@@ -17,15 +17,14 @@ CREATE TABLE IF NOT EXISTS people (
     birth_year  INTEGER,
     created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
--- One anniversary per couple; person_a < person_b.
+-- A person's anniversaries; kind is a key of dates.ANNIVERSARY_TYPES.
 CREATE TABLE IF NOT EXISTS anniversaries (
-    id       INTEGER PRIMARY KEY,
-    person_a INTEGER NOT NULL REFERENCES people(id) ON DELETE CASCADE,
-    person_b INTEGER NOT NULL REFERENCES people(id) ON DELETE CASCADE,
-    month    INTEGER NOT NULL,
-    day      INTEGER NOT NULL,
-    year     INTEGER,
-    UNIQUE (person_a, person_b)
+    id        INTEGER PRIMARY KEY,
+    person_id INTEGER NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+    kind      TEXT NOT NULL,
+    month     INTEGER NOT NULL,
+    day       INTEGER NOT NULL,
+    year      INTEGER
 );
 -- A phone or tablet that picked "who's using this". Only a hash of its cookie is stored.
 CREATE TABLE IF NOT EXISTS devices (
@@ -52,7 +51,30 @@ def connect() -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = WAL")
     conn.executescript(SCHEMA)
+    _migrate(conn)
     return conn
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Early M1 builds stored one anniversary per couple; keep it as person_a's wedding anniversary."""
+    cols = [r["name"] for r in conn.execute("PRAGMA table_info(anniversaries)")]
+    if "person_a" in cols:
+        conn.executescript("""
+            BEGIN;
+            ALTER TABLE anniversaries RENAME TO anniversaries_old;
+            CREATE TABLE anniversaries (
+                id        INTEGER PRIMARY KEY,
+                person_id INTEGER NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+                kind      TEXT NOT NULL,
+                month     INTEGER NOT NULL,
+                day       INTEGER NOT NULL,
+                year      INTEGER
+            );
+            INSERT INTO anniversaries (person_id, kind, month, day, year)
+                SELECT person_a, 'wedding', month, day, year FROM anniversaries_old;
+            DROP TABLE anniversaries_old;
+            COMMIT;
+        """)
 
 
 def get_setting(conn: sqlite3.Connection, key: str, default: str | None = None) -> str | None:

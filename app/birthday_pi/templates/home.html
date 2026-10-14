@@ -20,7 +20,7 @@
 </a>
 {% endif %}
 <section class="list" aria-labelledby="coming">
-  <h2 id="coming">Coming up</h2>
+  <h2 id="coming">Coming up <span class="muted small" style="font-weight: 400">· next 60 days</span></h2>
   {% for c in upcoming %}
   <div class="item">
     <span class="avatar">{{ c.initial }}</span>
@@ -28,7 +28,7 @@
     <span class="right">{{ short_date(c.when) }}<br><span class="muted small">{{ how_far(c.days_away) }}</span></span>
   </div>
   {% else %}
-  <p class="muted">No birthdays yet. Add someone's birthday and it shows up here.</p>
+  <p class="muted">Nothing in the next 60 days.{% if people_count <= 1 %} Add someone's birthday and it shows up here.{% endif %}</p>
   {% endfor %}
 </section>
 {% endblock %}

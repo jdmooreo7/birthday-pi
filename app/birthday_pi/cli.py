@@ -66,10 +66,10 @@ def load_sample(args) -> int:
             "INSERT INTO people (name, is_owner, birth_month, birth_day, birth_year) VALUES (?, ?, ?, ?, ?)",
             (name, is_owner, month, day, year),
         ).lastrowid
-    month, day = soon(25)
-    a, b = sorted((ids["Dana"], ids["Sam"]))
-    conn.execute("INSERT INTO anniversaries (person_a, person_b, month, day, year) VALUES (?, ?, ?, ?, 2013)",
-                 (a, b, month, day))
+    for name, kind, days, year in (("Dana", "wedding", 25, 2013), ("Uncle Ben", "graduation", 40, 1990)):
+        month, day = soon(days)
+        conn.execute("INSERT INTO anniversaries (person_id, kind, month, day, year) VALUES (?, ?, ?, ?, ?)",
+                     (ids[name], kind, month, day, year))
     pins.set_pin(conn, pin)
     db.set_setting(conn, "setup_complete", "1")
     print(f"Sample family loaded: {len(people)} people. Grandma's PIN is {pin}.")

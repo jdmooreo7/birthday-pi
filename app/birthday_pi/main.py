@@ -11,9 +11,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from . import db, devices, pins
-from .dates import MONTHS, how_far, missing_birthdays, short_date, upcoming, valid_month_day
+from .dates import ANNIVERSARY_TYPES, MONTHS, how_far, missing_birthdays, short_date, upcoming, valid_month_day
 
 HERE = Path(__file__).parent
+COMING_UP_DAYS = 60  # "Coming up" lists only celebrations this many days ahead
 PUBLIC_URL = os.environ.get("BIRTHDAY_PI_URL", "http://birthdaypi.local:8080").rstrip("/")
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
@@ -162,25 +163,20 @@ def home(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
     people_count = conn.execute("SELECT COUNT(*) FROM people").fetchone()[0]
     return page(
         request, "home.html", device=device, today=today(),
-        upcoming=upcoming(conn, today(), limit=6), missing=missing_birthdays(conn), people_count=people_count,
+        upcoming=upcoming(conn, today(), within_days=COMING_UP_DAYS), missing=missing_birthdays(conn), people_count=people_count,
     )
 
 
 def _people_list(conn: sqlite3.Connection) -> list[dict]:
-    partners = {}
-    for a in conn.execute(
-        "SELECT a.*, pa.name AS name_a, pb.name AS name_b FROM anniversaries a "
-        "JOIN people pa ON pa.id = a.person_a JOIN people pb ON pb.id = a.person_b"
-    ):
-        partners[a["person_a"]] = (a["name_b"], a)
-        partners[a["person_b"]] = (a["name_a"], a)
+    anns: dict[int, list[str]] = {}
+    for a in conn.execute("SELECT * FROM anniversaries ORDER BY month, day"):
+        label = ANNIVERSARY_TYPES.get(a["kind"], a["kind"].title())
+        anns.setdefault(a["person_id"], []).append(f"{label} anniversary · {MONTHS[a['month'] - 1]} {a['day']}")
     result = []
     for p in conn.execute("SELECT * FROM people ORDER BY is_owner DESC, name"):
         birthday = f"{MONTHS[p['birth_month'] - 1]} {p['birth_day']}" if p["birth_month"] else None
-        partner = partners.get(p["id"])
-        anniversary = f"{partner[0]} · {MONTHS[partner[1]['month'] - 1]} {partner[1]['day']}" if partner else None
         result.append({"id": p["id"], "name": p["name"], "is_owner": p["is_owner"],
-                       "birthday": birthday, "anniversary": anniversary})
+                       "birthday": birthday, "anniversaries": anns.get(p["id"], [])})
     return result
 
 
@@ -190,36 +186,41 @@ def people_list(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
     return page(request, "people.html", device=device, people=_people_list(conn))
 
 
-def _anniversary_for(conn: sqlite3.Connection, person_id: int) -> sqlite3.Row | None:
-    return conn.execute(
-        "SELECT * FROM anniversaries WHERE person_a = ? OR person_b = ?", (person_id, person_id)
-    ).fetchone()
+def _s(v) -> str:
+    return "" if v is None else str(v)
 
 
 def _form_values(conn: sqlite3.Connection, person: sqlite3.Row | None) -> dict:
-    if person is None:
-        return {"name": "", "birth_month": "", "birth_day": "", "birth_year": "",
-                "partner_id": "", "ann_month": "", "ann_day": "", "ann_year": ""}
-    ann = _anniversary_for(conn, person["id"])
-    partner_id = ""
-    if ann:
-        partner_id = ann["person_b"] if ann["person_a"] == person["id"] else ann["person_a"]
-
-    def s(v):
-        return "" if v is None else str(v)
-
-    return {
-        "name": person["name"], "birth_month": s(person["birth_month"]), "birth_day": s(person["birth_day"]),
-        "birth_year": s(person["birth_year"]), "partner_id": s(partner_id),
-        "ann_month": s(ann["month"]) if ann else "", "ann_day": s(ann["day"]) if ann else "",
-        "ann_year": s(ann["year"]) if ann else "",
-    }
+    """Values for the person form. Anniversary rows are ann_<i>_kind/_month/_day/_year,
+    one per saved anniversary plus one blank row for adding another."""
+    values = {"name": "", "birth_month": "", "birth_day": "", "birth_year": ""}
+    anns = []
+    if person is not None:
+        values.update(name=person["name"], birth_month=_s(person["birth_month"]),
+                      birth_day=_s(person["birth_day"]), birth_year=_s(person["birth_year"]))
+        anns = conn.execute("SELECT * FROM anniversaries WHERE person_id = ? ORDER BY id", (person["id"],)).fetchall()
+    for i, a in enumerate(anns):
+        values.update({f"ann_{i}_kind": a["kind"], f"ann_{i}_month": _s(a["month"]),
+                       f"ann_{i}_day": _s(a["day"]), f"ann_{i}_year": _s(a["year"])})
+    i = len(anns)
+    values.update({f"ann_{i}_kind": next(iter(ANNIVERSARY_TYPES)), f"ann_{i}_month": "", f"ann_{i}_day": "", f"ann_{i}_year": ""})
+    values["ann_count"] = i + 1
+    return values
 
 
-def _parse_person_form(form, person_id: int | None, conn: sqlite3.Connection) -> tuple[dict, dict, dict]:
+MAX_ANNIVERSARY_ROWS = 20
+
+
+def _parse_person_form(form) -> tuple[dict, dict, dict]:
     """Returns (values to redisplay, cleaned data, errors)."""
-    values = {k: str(form.get(k, "")).strip() for k in
-              ("name", "birth_month", "birth_day", "birth_year", "partner_id", "ann_month", "ann_day", "ann_year")}
+    try:
+        count = min(max(int(form.get("ann_count", "0")), 0), MAX_ANNIVERSARY_ROWS)
+    except ValueError:
+        count = 0
+    keys = ["name", "birth_month", "birth_day", "birth_year"]
+    for i in range(count):
+        keys += [f"ann_{i}_kind", f"ann_{i}_month", f"ann_{i}_day", f"ann_{i}_year"]
+    values = {k: str(form.get(k, "")).strip() for k in keys}
     errors: dict[str, str] = {}
     this_year = today().year
 
@@ -230,34 +231,36 @@ def _parse_person_form(form, person_id: int | None, conn: sqlite3.Connection) ->
             errors[key] = "Please use numbers only."
             return None
 
-    clean = {"name": values["name"]}
-    if not values["name"]:
-        errors["name"] = "Please type a name."
-    elif len(values["name"]) > 40:
-        errors["name"] = "Please use 40 letters or fewer."
-
-    for prefix, month_key, day_key, year_key in (("birth", "birth_month", "birth_day", "birth_year"),
-                                                 ("ann", "ann_month", "ann_day", "ann_year")):
-        month, day, year = to_int(month_key), to_int(day_key), to_int(year_key)
+    def date_parts(prefix):
+        month, day, year = to_int(f"{prefix}_month"), to_int(f"{prefix}_day"), to_int(f"{prefix}_year")
+        day_key = f"{prefix}_day"
         if (month is None) != (day is None):
             errors[day_key] = "Please pick both the month and the day."
         elif month is not None and not valid_month_day(month, day):
             errors[day_key] = f"{MONTHS[month - 1] if 1 <= month <= 12 else 'That month'} doesn't have a day {day}."
         if year is not None and not 1900 <= year <= this_year:
-            errors[year_key] = f"Please use a year between 1900 and {this_year}."
+            errors[f"{prefix}_year"] = f"Please use a year between 1900 and {this_year}."
         if year is not None and month is None:
             errors[day_key] = "Please pick the month and day too."
-        clean[month_key], clean[day_key], clean[year_key] = month, day, year
+        return month, day, year
 
-    partner_id = to_int("partner_id")
-    if partner_id is not None:
-        if partner_id == person_id or conn.execute("SELECT 1 FROM people WHERE id = ?", (partner_id,)).fetchone() is None:
-            errors["partner_id"] = "Please pick someone else."
-        elif clean["ann_month"] is None and "ann_day" not in errors:
-            errors["ann_day"] = "Please pick the anniversary month and day."
-    elif clean["ann_month"] is not None:
-        errors["partner_id"] = "Please pick who the anniversary is with."
-    clean["partner_id"] = partner_id
+    clean: dict = {"name": values["name"], "anniversaries": []}
+    if not values["name"]:
+        errors["name"] = "Please type a name."
+    elif len(values["name"]) > 40:
+        errors["name"] = "Please use 40 letters or fewer."
+    clean["birth_month"], clean["birth_day"], clean["birth_year"] = date_parts("birth")
+
+    for i in range(count):
+        prefix = f"ann_{i}"
+        month, day, year = date_parts(prefix)
+        if month is None and day is None and year is None:
+            continue  # a blank row, or one cleared to remove it
+        kind = values[f"{prefix}_kind"]
+        if kind not in ANNIVERSARY_TYPES:
+            errors[f"{prefix}_kind"] = "Please pick the kind of anniversary."
+        clean["anniversaries"].append((kind, month, day, year))
+    values["ann_count"] = count
     return values, clean, errors
 
 
@@ -272,25 +275,17 @@ def _save_person(conn: sqlite3.Connection, person_id: int | None, c: dict) -> in
             "UPDATE people SET name = ?, birth_month = ?, birth_day = ?, birth_year = ? WHERE id = ?",
             (c["name"], c["birth_month"], c["birth_day"], c["birth_year"], person_id),
         )
-    # One partner each: replace any anniversary either person had before.
-    ids = [person_id] + ([c["partner_id"]] if c["partner_id"] else [])
-    for pid in ids:
-        conn.execute("DELETE FROM anniversaries WHERE person_a = ? OR person_b = ?", (pid, pid))
-    if c["partner_id"]:
-        a, b = sorted((person_id, c["partner_id"]))
-        conn.execute(
-            "INSERT INTO anniversaries (person_a, person_b, month, day, year) VALUES (?, ?, ?, ?, ?)",
-            (a, b, c["ann_month"], c["ann_day"], c["ann_year"]),
-        )
+    conn.execute("DELETE FROM anniversaries WHERE person_id = ?", (person_id,))
+    conn.executemany(
+        "INSERT INTO anniversaries (person_id, kind, month, day, year) VALUES (?, ?, ?, ?, ?)",
+        [(person_id, *a) for a in c["anniversaries"]],
+    )
     return person_id
 
 
 def _person_page(request, conn, device, person, values, errors, status_code=200, welcome=False):
-    others = conn.execute(
-        "SELECT id, name FROM people WHERE id != ? ORDER BY name", (person["id"] if person else -1,)
-    ).fetchall()
     return page(request, "person_form.html", status_code, device=device, person=person, values=values,
-                errors=errors, others=others, welcome=welcome, this_year=today().year)
+                errors=errors, welcome=welcome, this_year=today().year, ANNIVERSARY_TYPES=ANNIVERSARY_TYPES)
 
 
 @app.get("/people/new")
@@ -302,7 +297,7 @@ def person_new(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
 @app.post("/people/new")
 async def person_create(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
     device = require_device(conn, request)
-    values, clean, errors = _parse_person_form(await request.form(), None, conn)
+    values, clean, errors = _parse_person_form(await request.form())
     if errors:
         return _person_page(request, conn, device, None, values, errors, 400)
     _save_person(conn, None, clean)
@@ -328,7 +323,7 @@ def person_edit(person_id: int, request: Request, conn: sqlite3.Connection = Dep
 async def person_update(person_id: int, request: Request, conn: sqlite3.Connection = Depends(get_conn)):
     device = require_device(conn, request)
     person = _get_person(conn, person_id)
-    values, clean, errors = _parse_person_form(await request.form(), person_id, conn)
+    values, clean, errors = _parse_person_form(await request.form())
     if errors:
         return _person_page(request, conn, device, person, values, errors, 400)
     _save_person(conn, person_id, clean)
@@ -360,7 +355,7 @@ def _screen_context(conn: sqlite3.Connection) -> dict:
         qr = segno.make(PUBLIC_URL + "/setup", error="m")
         svg = qr.svg_inline(scale=10, border=2, dark="#1d1b2f", light="#fdf6ec")
         return {"mode": "welcome", "qr_svg": svg, "setup_url": PUBLIC_URL.split("://", 1)[-1] + "/setup"}
-    return {"mode": "home", "today": today(), "upcoming": upcoming(conn, today(), limit=4),
+    return {"mode": "home", "today": today(), "upcoming": upcoming(conn, today(), within_days=COMING_UP_DAYS, limit=4),
             "missing_count": len(missing_birthdays(conn)), "now": datetime.now(),
             "phone_url": PUBLIC_URL.split("://", 1)[-1]}
 

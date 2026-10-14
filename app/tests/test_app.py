@@ -1,3 +1,5 @@
+from datetime import date, timedelta
+
 from birthday_pi import cli, db
 
 
@@ -44,18 +46,55 @@ def test_someone_new_is_added_and_asked_for_birthday(set_up):
     assert "2 people need a birthday" in client.get("/").text  # Dana and Grandma
 
 
-def test_add_person_with_birthday_and_anniversary(set_up):
+def test_add_person_with_birthday_and_typed_anniversaries(set_up):
     client = set_up
-    client.post("/people/new", data={"name": "Sam", "birth_month": "3", "birth_day": "9", "birth_year": "1984"})
-    sam_id = db.connect().execute("SELECT id FROM people WHERE name = 'Sam'").fetchone()[0]
-    r = client.post("/people/new", data={"name": "Dana", "birth_month": "7", "birth_day": "1",
-                                         "partner_id": str(sam_id), "ann_month": "9", "ann_day": "9", "ann_year": "2013"},
-                    follow_redirects=False)
+    form = client.get("/people/new").text
+    assert "Wedding" in form and "Graduation" in form and 'name="partner_id"' not in form
+    r = client.post("/people/new", data={"name": "Dana", "birth_month": "7", "birth_day": "1", "ann_count": "1",
+                                         "ann_0_kind": "wedding", "ann_0_month": "11", "ann_0_day": "9",
+                                         "ann_0_year": "2013"}, follow_redirects=False)
     assert r.status_code == 303
+    dana = db.connect().execute("SELECT id FROM people WHERE name = 'Dana'").fetchone()[0]
+    edit = client.get(f"/people/{dana}").text
+    assert 'name="ann_count" value="2"' in edit  # the saved one plus a blank row
+    client.post(f"/people/{dana}", data={"name": "Dana", "birth_month": "7", "birth_day": "1", "ann_count": "2",
+                                         "ann_0_kind": "wedding", "ann_0_month": "11", "ann_0_day": "9",
+                                         "ann_1_kind": "graduation", "ann_1_month": "6", "ann_1_day": "1"})
     everyone = client.get("/people").text
-    assert "March 9" in everyone and "Anniversary with Sam · September 9" in everyone
-    home = client.get("/").text
-    assert "Sam &amp; Dana" in home and "Sep 9" in home
+    assert "Wedding anniversary · November 9" in everyone and "Graduation anniversary · June 1" in everyone
+    # Setting the month to "–" removes it.
+    client.post(f"/people/{dana}", data={"name": "Dana", "ann_count": "2", "ann_0_kind": "wedding",
+                                         "ann_0_month": "11", "ann_0_day": "9", "ann_1_kind": "graduation"})
+    assert "Graduation" not in client.get("/people").text
+
+
+def test_coming_up_only_shows_next_60_days(set_up, monkeypatch):
+    from datetime import date
+    from birthday_pi import main
+    monkeypatch.setattr(main, "today", lambda: date(2026, 10, 14))
+    client = set_up
+    client.post("/people/new", data={"name": "Soon", "birth_month": "12", "birth_day": "13"})  # 60 days
+    client.post("/people/new", data={"name": "Later", "birth_month": "12", "birth_day": "14"})  # 61 days
+    for text in (client.get("/").text, client.get("/screen/content").text):
+        assert "Soon" in text and "Later" not in text
+
+
+def test_old_couple_anniversaries_are_migrated(tmp_path, monkeypatch):
+    import sqlite3
+    monkeypatch.setenv("BIRTHDAY_PI_DATA", str(tmp_path))
+    old = sqlite3.connect(tmp_path / "birthday-pi.db")
+    old.executescript("""
+        CREATE TABLE people (id INTEGER PRIMARY KEY, name TEXT NOT NULL, is_owner INTEGER NOT NULL DEFAULT 0,
+            birth_month INTEGER, birth_day INTEGER, birth_year INTEGER, created_at TEXT);
+        CREATE TABLE anniversaries (id INTEGER PRIMARY KEY, person_a INTEGER NOT NULL, person_b INTEGER NOT NULL,
+            month INTEGER NOT NULL, day INTEGER NOT NULL, year INTEGER, UNIQUE (person_a, person_b));
+        INSERT INTO people (id, name) VALUES (1, 'Sam'), (2, 'Dana');
+        INSERT INTO anniversaries (person_a, person_b, month, day, year) VALUES (1, 2, 9, 9, 2013);
+    """)
+    old.commit()
+    old.close()
+    row = db.connect().execute("SELECT person_id, kind, month, day, year FROM anniversaries").fetchone()
+    assert tuple(row) == (1, "wedding", 9, 9, 2013)
 
 
 def test_person_form_rejects_bad_dates(set_up):
@@ -64,8 +103,8 @@ def test_person_form_rejects_bad_dates(set_up):
     assert r.status_code == 400 and "February doesn&#39;t have a day 30" in r.text
     r = client.post("/people/new", data={"name": "Leo", "birth_month": "2"})
     assert r.status_code == 400 and "both the month and the day" in r.text
-    r = client.post("/people/new", data={"name": "", "ann_month": "1", "ann_day": "1"})
-    assert "Please type a name" in r.text and "who the anniversary is with" in r.text
+    r = client.post("/people/new", data={"name": "", "ann_count": "1", "ann_0_kind": "wedding", "ann_0_month": "4", "ann_0_day": "31"})
+    assert "Please type a name" in r.text and "April doesn&#39;t have a day 31" in r.text
 
 
 def test_remove_person_but_never_grandma(set_up):
@@ -82,7 +121,8 @@ def test_remove_person_but_never_grandma(set_up):
 
 def test_monitor_home_lists_coming_up(set_up):
     client = set_up
-    client.post("/people/new", data={"name": "Mia", "birth_month": "3", "birth_day": "14"})
+    soon = date.today() + timedelta(days=5)
+    client.post("/people/new", data={"name": "Mia", "birth_month": str(soon.month), "birth_day": str(soon.day)})
     screen = client.get("/screen/content").text
     assert "Coming up" in screen and "Mia" in screen
     assert "Let's meet your family." not in screen
@@ -103,4 +143,5 @@ def test_load_sample_only_on_fresh_pi(client, capsys):
     assert cli.main(["load-sample"]) == 1
     conn = db.connect()
     assert conn.execute("SELECT COUNT(*) FROM people").fetchone()[0] == 9
+    assert conn.execute("SELECT COUNT(*) FROM anniversaries").fetchone()[0] == 2
     assert "Aunt Rosa" in client.get("/screen/content").text

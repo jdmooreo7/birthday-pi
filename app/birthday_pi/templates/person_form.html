@@ -14,16 +14,22 @@
     {% with prefix = "birth" %}{% include "_date_fields.html" %}{% endwith %}
   </fieldset>
   <fieldset>
-    <legend>Anniversary <span class="muted small" style="font-weight: 400">(optional)</span></legend>
-    <div class="field{% if errors.partner_id %} has-error{% endif %}">
-      <label for="partner_id">With</label>
-      <select id="partner_id" name="partner_id">
-        <option value="">No one</option>
-        {% for o in others %}<option value="{{ o.id }}"{% if values.partner_id == o.id | string %} selected{% endif %}>{{ o.name }}</option>{% endfor %}
-      </select>
-      {% if errors.partner_id %}<div class="error">{{ errors.partner_id }}</div>{% endif %}
+    <legend>Anniversaries <span class="muted small" style="font-weight: 400">(optional)</span></legend>
+    <input type="hidden" name="ann_count" value="{{ values.ann_count }}">
+    {% for i in range(values.ann_count) %}
+    {% set prefix = "ann_" ~ i %}
+    <div class="card">
+      <div class="field{% if errors[prefix ~ '_kind'] %} has-error{% endif %}">
+        <label for="{{ prefix }}_kind">Kind</label>
+        <select id="{{ prefix }}_kind" name="{{ prefix }}_kind">
+          {% for key, label in ANNIVERSARY_TYPES.items() %}<option value="{{ key }}"{% if values[prefix ~ '_kind'] == key %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+        {% if errors[prefix ~ '_kind'] %}<div class="error">{{ errors[prefix ~ '_kind'] }}</div>{% endif %}
+      </div>
+      {% include "_date_fields.html" %}
     </div>
-    {% with prefix = "ann" %}{% include "_date_fields.html" %}{% endwith %}
+    {% endfor %}
+    <p class="muted small">To add another, save first. To remove one, set its month to "–".</p>
   </fieldset>
   <button class="btn" type="submit">Save</button>
 </form>

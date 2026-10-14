@@ -9,7 +9,7 @@
     <span class="avatar{% if p.is_owner %} owner{% endif %}">{{ p.name[:1] | upper }}</span>
     <span class="grow">
       <span class="name">{{ p.name }}</span>
-      {% if p.anniversary %}<span class="muted small">Anniversary with {{ p.anniversary }}</span>{% endif %}
+      {% for a in p.anniversaries %}<span class="muted small">{{ a }}</span>{% endfor %}
     </span>
     {% if p.birthday %}<span class="right">{{ p.birthday }}</span>{% else %}<span class="right" style="color: var(--accent)">Add birthday</span>{% endif %}
   </a>
