@@ -136,3 +136,132 @@ def test_m5_database_gets_the_new_columns(tmp_path, monkeypatch):
     conn = db.connect()
     assert "ignored" in [r[1] for r in conn.execute("PRAGMA table_info(face_groups)")]
     assert "not_group" in [r[1] for r in conn.execute("PRAGMA table_info(faces)")]
+
+
+# ---------- M7: recognising later imports, corrections, forgetting ----------
+
+def _named(client, conn, **kw):
+    """Mia (4 photos) and Leo (3) named by Grandma, as in M6."""
+    _family_photos(conn, **kw)
+    mia, leo = _group_of(conn, 0), _group_of(conn, 1)
+    client.post(f"/faces/{mia}/who", data={"new_name": "Mia"})
+    client.post(f"/faces/{leo}/who", data={"new_name": "Leo"})
+    return mia, leo
+
+
+def _import(conn, pid, *found):
+    _photo(conn, pid)
+    faces.scan_waiting(conn, FakeFinder({pid: list(found)}))
+    return conn.execute("SELECT id, group_id, ask_group, confirmed FROM faces WHERE photo_id = ?", (pid,)).fetchall()
+
+
+def test_clear_match_is_named_without_asking(set_up):
+    client, conn = set_up, db.connect()
+    mia, leo = _named(client, conn)
+    assert conn.execute("SELECT COUNT(*) FROM faces WHERE confirmed = 1").fetchone()[0] == 7
+    (face,) = _import(conn, "a" * 16, _unit(1, 0.12))
+    assert (face["group_id"], face["ask_group"], face["confirmed"]) == (mia, None, 0)
+    assert naming.asking(conn) == []
+
+
+def test_unsure_match_asks_is_this_leo(set_up):
+    client, conn = set_up, db.connect()
+    mia, leo = _named(client, conn)
+    (face,) = _import(conn, "a" * 16, _unit(0.1, 1, 2))  # like Leo, but not clearly (similarity 0.45)
+    assert (face["group_id"], face["ask_group"]) == (None, leo)
+    assert [(a["id"], a["name"]) for a in naming.asking(conn)] == [(face["id"], "Leo")]
+    faces.scan_waiting(conn, FakeFinder({}))  # the worker leaves it for Grandma
+    assert naming.ask(conn, face["id"])["ask_group"] == leo
+    naming.answer(conn, face["id"], yes=True)
+    row = conn.execute("SELECT group_id, ask_group, confirmed FROM faces WHERE id = ?", (face["id"],)).fetchone()
+    assert tuple(row) == (leo, None, 1) and naming.asking(conn) == []
+
+
+def test_no_to_is_this_leo_is_never_asked_again(set_up):
+    client, conn = set_up, db.connect()
+    mia, leo = _named(client, conn)
+    (face,) = _import(conn, "a" * 16, _unit(0.1, 1, 2))
+    naming.answer(conn, face["id"], yes=False)
+    faces.scan_waiting(conn, FakeFinder({}))
+    row = conn.execute("SELECT group_id, ask_group FROM faces WHERE id = ?", (face["id"],)).fetchone()
+    assert row["group_id"] not in (None, mia, leo) and row["ask_group"] is None
+
+
+def test_too_few_confirmed_faces_asks_first(set_up):
+    client, conn = set_up, db.connect()
+    _named(client, conn, n_leo=2)  # Grandma has only seen Leo twice
+    leo = _group_of(conn, 1)
+    (face,) = _import(conn, "a" * 16, _unit(0.1, 1))  # an exact match still asks
+    assert (face["group_id"], face["ask_group"]) == (None, leo)
+
+
+def test_look_alikes_ask_rather_than_guess(set_up):
+    client, conn = set_up, db.connect()
+    _named(client, conn)
+    (face,) = _import(conn, "a" * 16, _unit(1, 1))  # just as like Mia as Leo
+    assert face["group_id"] is None and face["ask_group"] is not None
+
+
+def test_two_faces_in_one_photo_are_not_both_the_same_person(set_up):
+    client, conn = set_up, db.connect()
+    mia, leo = _named(client, conn)
+    found = _import(conn, "a" * 16, _unit(1, 0.12), _unit(1, 0.1))  # Mia and a look-alike sibling
+    assert sorted(f["group_id"] == mia or f["ask_group"] == mia for f in found) == [False, True]
+
+
+def test_unnaming_sends_waiting_questions_back(set_up):
+    client, conn = set_up, db.connect()
+    mia, leo = _named(client, conn)
+    (face,) = _import(conn, "a" * 16, _unit(0.1, 1, 2))
+    client.post(f"/faces/{leo}/undo")
+    assert conn.execute("SELECT COUNT(*) FROM faces WHERE group_id = ? AND confirmed = 1", (leo,)).fetchone()[0] == 0
+    assert naming.asking(conn) == []
+
+
+def test_not_leo_takes_faces_out_and_confirms_the_rest(set_up):
+    client, conn = set_up, db.connect()
+    mia, leo = _named(client, conn)
+    (auto,) = _import(conn, "a" * 16, _unit(0.12, 1))  # named automatically, not yet seen by Grandma
+    person = naming.group(conn, leo)["person_id"]
+    wrong = naming.person_faces(conn, person)[0]["id"]
+    assert naming.not_person(conn, person, [wrong]) == 1
+    assert wrong not in [f["id"] for f in naming.person_faces(conn, person)]
+    assert conn.execute("SELECT confirmed FROM faces WHERE id = ?", (auto["id"],)).fetchone()[0] == 1
+
+
+def test_remove_person_forgets_their_face(set_up):
+    client, conn = set_up, db.connect()
+    mia, leo = _named(client, conn)
+    (waiting,) = _import(conn, "a" * 16, _unit(0.1, 1, 2))
+    leo_faces = [r[0] for r in conn.execute("SELECT id FROM faces WHERE group_id = ?", (leo,))] + [waiting["id"]]
+    for fid in leo_faces:
+        assert photos.face_crop_path(fid).exists()
+    person = naming.group(conn, leo)["person_id"]
+    assert "their face in your photos" in client.get(f"/people/{person}/remove").text
+    client.post(f"/people/{person}/remove")
+    marks = ",".join("?" * len(leo_faces))
+    assert conn.execute(f"SELECT COUNT(*) FROM faces WHERE id IN ({marks})", leo_faces).fetchone()[0] == 0
+    assert not any(photos.face_crop_path(f).exists() for f in leo_faces)
+    assert naming.group(conn, leo) is None and naming.asking(conn) == []
+    assert conn.execute("SELECT COUNT(*) FROM photos").fetchone()[0] == 5  # the photos stay
+    faces.scan_waiting(conn, FakeFinder({}))
+    assert [g["id"] for g in naming.to_name(conn)] == []  # nothing about Leo comes back to name
+    assert naming.group(conn, mia)["person_id"] is not None
+
+
+def test_m6_database_counts_named_faces_as_confirmed(tmp_path, monkeypatch):
+    import sqlite3
+    monkeypatch.setenv("BIRTHDAY_PI_DATA", str(tmp_path))
+    old = sqlite3.connect(tmp_path / "birthday-pi.db")
+    old.executescript("""
+        CREATE TABLE face_groups (id INTEGER PRIMARY KEY, person_id INTEGER, ignored TEXT);
+        CREATE TABLE faces (id INTEGER PRIMARY KEY, photo_id TEXT NOT NULL, group_id INTEGER, not_group INTEGER,
+            x INTEGER NOT NULL, y INTEGER NOT NULL, w INTEGER NOT NULL, h INTEGER NOT NULL, score REAL NOT NULL,
+            embedding BLOB NOT NULL);
+        INSERT INTO face_groups VALUES (1, 7, NULL), (2, NULL, NULL);
+        INSERT INTO faces VALUES (1, 'p', 1, NULL, 0, 0, 1, 1, 0.9, x''), (2, 'p', 2, NULL, 0, 0, 1, 1, 0.9, x'');
+    """)
+    old.commit()
+    old.close()
+    conn = db.connect()
+    assert [tuple(r) for r in conn.execute("SELECT id, confirmed, ask_group FROM faces ORDER BY id")] == [(1, 1, None), (2, 0, None)]

@@ -452,6 +452,9 @@ def person_remove(person_id: int, request: Request, conn: sqlite3.Connection = D
     require_device(conn, request)
     person = _get_person(conn, person_id)
     if not person["is_owner"]:
+        # Their face data goes too: a removed person is forgotten, not left waiting to be named again.
+        for face_id in naming.forget_person(conn, person_id):
+            photos.face_crop_path(face_id).unlink(missing_ok=True)
         conn.execute("DELETE FROM people WHERE id = ?", (person_id,))
     return RedirectResponse("/people", status_code=303)
 

@@ -63,6 +63,8 @@ CREATE TABLE IF NOT EXISTS faces (
     photo_id  TEXT NOT NULL REFERENCES photos(id) ON DELETE CASCADE,
     group_id  INTEGER REFERENCES face_groups(id) ON DELETE SET NULL,  -- NULL: waiting for the worker to place it
     not_group INTEGER,  -- the group it was taken out of ("isn't them"), so the worker won't put it back
+    confirmed INTEGER NOT NULL DEFAULT 0,  -- Grandma saw it in a group she named (M7 counts these)
+    ask_group INTEGER,  -- a named group it may belong to: waiting for "Is this Leo?" (M7)
     x INTEGER NOT NULL, y INTEGER NOT NULL, w INTEGER NOT NULL, h INTEGER NOT NULL,
     score     REAL NOT NULL,
     embedding BLOB NOT NULL
@@ -108,6 +110,10 @@ def _migrate(conn: sqlite3.Connection) -> None:
     _add_column(conn, "photos", "faces_scanned", "INTEGER NOT NULL DEFAULT 0")  # v0.1
     _add_column(conn, "face_groups", "ignored", "TEXT")  # M5
     _add_column(conn, "faces", "not_group", "INTEGER")  # M5
+    if _add_column(conn, "faces", "confirmed", "INTEGER NOT NULL DEFAULT 0"):  # M7
+        # Grandma looked at every face in the groups she named in M6.
+        conn.execute("UPDATE faces SET confirmed = 1 WHERE group_id IN (SELECT id FROM face_groups WHERE person_id IS NOT NULL)")
+    _add_column(conn, "faces", "ask_group", "INTEGER")  # M7
     # Early M1 builds stored one anniversary per couple; keep it as person_a's wedding anniversary.
     cols = [r["name"] for r in conn.execute("PRAGMA table_info(anniversaries)")]
     if "person_a" in cols:
@@ -129,11 +135,14 @@ def _migrate(conn: sqlite3.Connection) -> None:
         """)
 
 
-def _add_column(conn: sqlite3.Connection, table: str, column: str, decl: str) -> None:
-    """Adds a column to a table from an earlier build. A table that doesn't exist yet gets it from SCHEMA."""
+def _add_column(conn: sqlite3.Connection, table: str, column: str, decl: str) -> bool:
+    """Adds a column to a table from an earlier build. A table that doesn't exist yet gets it from SCHEMA.
+    Returns whether it was added."""
     cols = [r["name"] for r in conn.execute(f"PRAGMA table_info({table})")]
     if cols and column not in cols:
         conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+        return True
+    return False
 
 
 def get_setting(conn: sqlite3.Connection, key: str, default: str | None = None) -> str | None:

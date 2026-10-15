@@ -19,6 +19,11 @@ MODELS = Path(os.environ.get("BIRTHDAY_PI_MODELS", "/models"))
 MIN_FACE = 40  # px on the screen-sized photo; smaller faces are background people
 MIN_SCORE = 0.8  # YuNet detection confidence
 MATCH = 0.363  # SFace cosine similarity for "same person" (OpenCV Zoo's threshold)
+# M7: a new face is named without asking only on a clear match to someone Grandma has confirmed 3 faces of.
+# Measured on the family's 126 named faces (leave one out): 91% named this way, none wrongly.
+AUTO = 0.5
+AUTO_MARGIN = 0.1  # ahead of the next most likely named person by at least this much
+AUTO_CONFIRMED = 3
 POLL_SECONDS = 10
 HEARTBEAT = "faces_heartbeat"  # setting the app reads to tell whether the worker is running
 HEALTHY_WITHIN = 120  # seconds; the container is unhealthy if the heartbeat is older than this
@@ -43,32 +48,74 @@ def from_blob(blob: bytes) -> np.ndarray:
 
 
 class Groups:
-    """Each group's summed embedding, so a new face joins the group whose average it's closest to."""
+    """Each group's summed embedding, so a new face joins the group whose average it's closest to.
+
+    Named groups are compared per person (all of a person's groups together). A face that matches a named
+    person joins them only on a clear match; otherwise it waits for Grandma ("Is this Leo?")."""
 
     def __init__(self, conn: sqlite3.Connection):
         self.sums: dict[int, np.ndarray] = {}
+        self.sizes: dict[int, int] = {}
         for row in conn.execute("SELECT group_id, embedding FROM faces WHERE group_id IS NOT NULL"):
             vec = from_blob(row["embedding"])
             self.sums[row["group_id"]] = self.sums.get(row["group_id"], 0) + vec
+            self.sizes[row["group_id"]] = self.sizes.get(row["group_id"], 0) + 1
+        self.person_of = {r[0]: r[1] for r in conn.execute(
+            "SELECT id, person_id FROM face_groups WHERE person_id IS NOT NULL") if r[0] in self.sums}
+        self.confirmed = {r[0]: r[1] for r in conn.execute(
+            "SELECT g.person_id, COUNT(*) FROM faces f JOIN face_groups g ON g.id = f.group_id "
+            "WHERE g.person_id IS NOT NULL AND f.confirmed = 1 GROUP BY g.person_id")}
 
-    def nearest(self, feature: np.ndarray, exclude: set[int] = frozenset()) -> tuple[int | None, float]:
-        ids = [i for i in self.sums if i not in exclude]
-        if not ids:
-            return None, 0.0
-        means = np.array([self.sums[i] for i in ids])
+    def nearest(self, feature: np.ndarray, exclude: set[int] = frozenset(),
+                named: bool = True) -> tuple[int | None, float, float]:
+        """The closest group (for a named person, their biggest group), its similarity, and how far ahead
+        it is of the closest other named person."""
+        blocked = {self.person_of[g] for g in exclude if g in self.person_of}  # nobody twice in one photo
+        candidates: dict[tuple, np.ndarray] = {}
+        for g, total in self.sums.items():
+            person = self.person_of.get(g)
+            if person is None:
+                if g not in exclude:
+                    candidates[("group", g)] = total
+            elif named and person not in blocked:
+                candidates[("person", person)] = candidates.get(("person", person), 0) + total
+        if not candidates:
+            return None, 0.0, 0.0
+        keys = list(candidates)
+        means = np.array([candidates[k] for k in keys])
         means /= np.linalg.norm(means, axis=1, keepdims=True)
         sims = means @ feature
         best = int(np.argmax(sims))
-        return ids[best], float(sims[best])
+        kind, key = keys[best]
+        if kind == "group":
+            return key, float(sims[best]), 0.0
+        others = [float(s) for k, s in zip(keys, sims) if k[0] == "person" and k[1] != key]
+        biggest = max((g for g, p in self.person_of.items() if p == key), key=lambda g: self.sizes.get(g, 0))
+        return biggest, float(sims[best]), float(sims[best]) - max(others, default=0.0)
 
-    def assign(self, conn: sqlite3.Connection, feature: np.ndarray, exclude: set[int] = frozenset()) -> int:
-        """exclude: groups already used in this photo, since nobody appears twice in one photo."""
-        group_id, sim = self.nearest(feature, exclude)
+    def place(self, conn: sqlite3.Connection, feature: np.ndarray, exclude: set[int] = frozenset(),
+              named: bool = True) -> tuple[int | None, int | None]:
+        """Returns (group_id, ask_group): the group the face joins, or the named group to ask Grandma about.
+        exclude: groups already used in this photo, since nobody appears twice in one photo.
+        named=False keeps it out of named groups (a face Grandma said isn't someone)."""
+        group_id, sim, margin = self.nearest(feature, exclude, named)
+        person = self.person_of.get(group_id)
+        if person is not None and sim >= MATCH:
+            if sim >= AUTO and margin >= AUTO_MARGIN and self.confirmed.get(person, 0) >= AUTO_CONFIRMED:
+                self._add(group_id, feature)
+                return group_id, None
+            return None, group_id
+        if person is not None:  # not like anyone named: compare with the unnamed groups only
+            group_id, sim, _ = self.nearest(feature, exclude, named=False)
         if group_id is None or sim < MATCH:
             group_id = conn.execute("INSERT INTO face_groups DEFAULT VALUES").lastrowid
             self.sums[group_id] = np.zeros_like(feature)
+        self._add(group_id, feature)
+        return group_id, None
+
+    def _add(self, group_id: int, feature: np.ndarray) -> None:
         self.sums[group_id] = self.sums[group_id] + feature
-        return group_id
+        self.sizes[group_id] = self.sizes.get(group_id, 0) + 1
 
 
 class Finder:
@@ -105,12 +152,13 @@ def scan(conn: sqlite3.Connection, finder: Finder, photo_id: str, groups: Groups
     conn.execute("BEGIN")
     try:
         for det, crop, feature in found:
-            group_id = groups.assign(conn, feature, used)
-            used.add(group_id)
+            group_id, ask_group = groups.place(conn, feature, used)
+            used.add(group_id or ask_group)
             x, y, w, h = (int(round(v)) for v in det[:4])
             face_id = conn.execute(
-                "INSERT INTO faces (photo_id, group_id, x, y, w, h, score, embedding) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (photo_id, group_id, x, y, w, h, float(det[14]), to_blob(feature)),
+                "INSERT INTO faces (photo_id, group_id, ask_group, x, y, w, h, score, embedding) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (photo_id, group_id, ask_group, x, y, w, h, float(det[14]), to_blob(feature)),
             ).lastrowid
             crops.append((face_id, crop))
         conn.execute("UPDATE photos SET faces_scanned = 1 WHERE id = ?", (photo_id,))
@@ -125,15 +173,19 @@ def scan(conn: sqlite3.Connection, finder: Finder, photo_id: str, groups: Groups
 
 
 def regroup(conn: sqlite3.Connection, groups: Groups) -> int:
-    """Places faces Grandma took out of a group ("isn't them"): never back in that group, nor in a group
-    another face in the same photo is already in. Returns how many were placed."""
-    loose = conn.execute("SELECT id, photo_id, not_group, embedding FROM faces WHERE group_id IS NULL ORDER BY id").fetchall()
+    """Places faces Grandma took out of a group ("isn't them") or said No to ("Is this Leo?"): never back
+    in that group, nor in a group another face in the same photo is already in, and only among the unnamed
+    groups, so she isn't asked about the same face again and again. Returns how many were placed."""
+    loose = conn.execute(
+        "SELECT id, photo_id, not_group, embedding FROM faces WHERE group_id IS NULL AND ask_group IS NULL ORDER BY id"
+    ).fetchall()
     for face in loose:
         taken = {r[0] for r in conn.execute(
-            "SELECT group_id FROM faces WHERE photo_id = ? AND group_id IS NOT NULL", (face["photo_id"],))}
+            "SELECT COALESCE(group_id, ask_group) FROM faces WHERE photo_id = ? AND id != ? "
+            "AND COALESCE(group_id, ask_group) IS NOT NULL", (face["photo_id"], face["id"]))}
         exclude = taken | ({face["not_group"]} if face["not_group"] else set())
         conn.execute("BEGIN")
-        group_id = groups.assign(conn, from_blob(face["embedding"]), exclude)
+        group_id, _ = groups.place(conn, from_blob(face["embedding"]), exclude, named=False)
         conn.execute("UPDATE faces SET group_id = ? WHERE id = ?", (group_id, face["id"]))
         conn.execute("COMMIT")
     return len(loose)
@@ -143,7 +195,7 @@ def scan_waiting(conn: sqlite3.Connection, finder: Finder) -> tuple[int, int]:
     """Scans every photo not looked at yet, oldest first, then places any faces taken out of a group.
     Returns (photos, faces found)."""
     todo = [r["id"] for r in conn.execute("SELECT id FROM photos WHERE faces_scanned = 0 ORDER BY created_at, id")]
-    loose = conn.execute("SELECT 1 FROM faces WHERE group_id IS NULL LIMIT 1").fetchone()
+    loose = conn.execute("SELECT 1 FROM faces WHERE group_id IS NULL AND ask_group IS NULL LIMIT 1").fetchone()
     if not todo and not loose:
         return 0, 0
     groups = Groups(conn)  # reloaded each round, since Grandma can take faces out of groups in the app
