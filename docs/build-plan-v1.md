@@ -80,6 +80,8 @@ v0.1 shipped on 2026-10-14 (tag `v0.1.0`). v0.2 adds photo-first onboarding from
 ## Backlog (after v0.1)
 - Family tree that fills in as birthdays are added (`features/family-tree-progress.md`).
 - Integrations, phone alerts and text-message approval links (see `features/`).
+- Backups of the family's data off the SD card (nice-to-have; approach to be decided).
+- Alert notifications to whoever looks after the Pi (`features/ops-alert-notifications.md`).
 
 ## Risks
 - **iPhone HEIC support on ARM** may need extra packages in the image. Check this in M0.

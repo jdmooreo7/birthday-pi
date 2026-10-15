@@ -2,7 +2,9 @@
 # Optional live dashboards for whoever looks after the Pi: docker compose --profile observe up -d (see README).
 
 # Hardening shared by every container: no Linux capabilities, no privilege escalation, read-only filesystem.
+# init: a small PID 1, so a failing health check can stop the main process and Docker restarts it.
 x-hardened: &hardened
+  init: true
   cap_drop: [ALL]
   security_opt: [no-new-privileges:true]
   read_only: true

@@ -16,6 +16,7 @@ RUN useradd --uid 1000 --create-home app && mkdir /data && chown app /data
 USER app
 
 EXPOSE 8080
-HEALTHCHECK --interval=60s --timeout=5s \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz')"
+# After 3 failed checks in a row, selfcheck stops the app so Docker restarts it.
+HEALTHCHECK --interval=60s --timeout=40s --start-period=30s \
+  CMD python -m birthday_pi.selfcheck app
 CMD ["uvicorn", "birthday_pi.main:app", "--host", "0.0.0.0", "--port", "8080"]

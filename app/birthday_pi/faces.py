@@ -7,7 +7,6 @@ It needs OpenCV and NumPy, which the app container doesn't have.
 import logging
 import os
 import sqlite3
-import sys
 import time
 from datetime import datetime
 from pathlib import Path
@@ -139,7 +138,7 @@ def scan_waiting(conn: sqlite3.Connection, finder: Finder) -> tuple[int, int]:
 
 
 def healthy() -> bool:
-    """For the container health check: has the worker written its heartbeat lately?"""
+    """For the container health check (selfcheck.py): has the worker written its heartbeat lately?"""
     conn = db.connect()
     try:
         beat = db.get_setting(conn, HEARTBEAT)
@@ -149,8 +148,6 @@ def healthy() -> bool:
 
 
 def main() -> None:
-    if sys.argv[1:] == ["--check"]:
-        sys.exit(0 if healthy() else 1)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     os.nice(10)  # the monitor and the app come first
     finder = Finder()

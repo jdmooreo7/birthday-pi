@@ -4,6 +4,7 @@ import os
 import re
 import secrets
 import sqlite3
+import threading
 import time
 from datetime import date, datetime
 from pathlib import Path
@@ -13,6 +14,7 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.concurrency import run_in_threadpool
 
 from . import db, devices, photos, pins, reminders
 from .dates import ANNIVERSARY_TYPES, MONTHS, how_far, missing_birthdays, short_date, upcoming, valid_month_day
@@ -483,6 +485,14 @@ def photo_add_form(request: Request, conn: sqlite3.Connection = Depends(get_conn
     return page(request, "photo_add.html", device=device, trusted_owner=devices.is_trusted_owner(device))
 
 
+UPLOAD_LOCK = threading.Lock()  # one photo resized at a time keeps memory under the 256 MB limit
+
+
+def _save_photo(conn: sqlite3.Connection, data: bytes, person_id: int, approved: bool) -> str | None:
+    with UPLOAD_LOCK:
+        return photos.save_upload(conn, data, person_id, approved)
+
+
 @app.post("/photos/add")
 async def photo_add(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
     device = require_device(conn, request)
@@ -496,7 +506,8 @@ async def photo_add(request: Request, conn: sqlite3.Connection = Depends(get_con
         if not data:
             continue
         try:
-            photo_id = photos.save_upload(conn, data, device["person_id"], approved=trusted)
+            # Off the event loop, so the monitor and the health check keep answering during a big upload.
+            photo_id = await run_in_threadpool(_save_photo, conn, data, device["person_id"], trusted)
         except photos.UploadError as e:
             problems.append(f"{upload.filename or 'A photo'} {e}.")
             continue
