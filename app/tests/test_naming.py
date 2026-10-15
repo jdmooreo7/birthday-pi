@@ -265,3 +265,60 @@ def test_m6_database_counts_named_faces_as_confirmed(tmp_path, monkeypatch):
     old.close()
     conn = db.connect()
     assert [tuple(r) for r in conn.execute("SELECT id, confirmed, ask_group FROM faces ORDER BY id")] == [(1, 1, None), (2, 0, None)]
+
+
+def test_is_this_leo_screens(set_up):
+    client, conn = set_up, db.connect()
+    mia, leo = _named(client, conn)
+    first = _import(conn, "a" * 16, _unit(0.1, 1, 2))[0]["id"]
+    second = _import(conn, "b" * 16, _unit(1, 0.1, 2))[0]["id"]  # unsure: like Mia
+    third = _import(conn, "c" * 16, _unit(0.1, 1, 2.1))[0]["id"]
+    conn.execute("UPDATE photos SET width = 1600, height = 1200")
+    assert "3 faces to check" in client.get("/").text
+    page = client.get("/faces/ask").text
+    assert "Is this Leo?" in page and "3 to check" in page and f"/face-files/{first}.jpg" in page
+    assert f'/photo-files/{"a" * 16}-thumb.jpg' in page and 'class="ring" style="left: ' in page
+    r = client.post(f"/faces/ask/{first}?yes=0", data={"action": "yes"}, follow_redirects=False)
+    assert r.headers["location"] == f"/faces/ask?after={first}&yes=1"
+    page = client.get(r.headers["location"]).text
+    assert "Is this Mia?" in page and "2 to check" in page
+    client.post(f"/faces/ask/{second}?yes=1", data={"action": "no"})
+    r = client.post(f"/faces/ask/{third}?yes=1", data={"action": "skip"}, follow_redirects=False)
+    done = client.get(r.headers["location"]).text
+    assert "All checked" in done and "1 face added" in done and "1 you skipped" in done
+    assert [a["id"] for a in naming.asking(conn)] == [third]
+    assert conn.execute("SELECT group_id, confirmed FROM faces WHERE id = ?", (first,)).fetchone()[:] == (leo, 1)
+    assert "Is this Leo?" in client.get("/faces/ask").text  # asked again next time
+
+
+def test_is_this_all_leo_screen(set_up):
+    client, conn = set_up, db.connect()
+    mia, leo = _named(client, conn)
+    auto = _import(conn, "a" * 16, _unit(0.12, 1))[0]["id"]
+    person = naming.group(conn, leo)["person_id"]
+    edit = client.get(f"/people/{person}").text
+    assert f'href="/people/{person}/faces"' in edit and "In 4 photos. Is this all Leo?" in edit
+    page = client.get(f"/people/{person}/faces").text
+    assert page.count('name="out"') == 4 and page.count('class="new-badge on-tile"') == 1 and "Named by Birthday Pi" in page
+    wrong = next(f["id"] for f in naming.person_faces(conn, person) if f["id"] != auto)
+    r = client.post(f"/people/{person}/faces", data={"out": str(wrong)}, follow_redirects=False)
+    assert r.headers["location"] == f"/people/{person}"
+    assert wrong not in [f["id"] for f in naming.person_faces(conn, person)]
+    assert conn.execute("SELECT confirmed FROM faces WHERE id = ?", (auto,)).fetchone()[0] == 1
+    assert "Named by Birthday Pi" not in client.get(f"/people/{person}/faces").text
+
+
+def test_checking_faces_is_grandma_only(set_up):
+    client, conn = set_up, db.connect()
+    mia, leo = _named(client, conn)
+    face = _import(conn, "a" * 16, _unit(0.1, 1, 2))[0]["id"]
+    person = naming.group(conn, leo)["person_id"]
+    client.cookies.clear()
+    client.post("/who", data={"new_name": "Dana"})
+    assert "to check" not in client.get("/").text
+    assert "Leo's faces" not in client.get(f"/people/{person}").text
+    for url in ("/faces/ask", f"/people/{person}/faces"):
+        assert client.get(url, follow_redirects=False).headers["location"] == "/pin"
+    for url, data in ((f"/faces/ask/{face}", {"action": "yes"}), (f"/people/{person}/faces", {"out": str(face)})):
+        assert client.post(url, data=data, follow_redirects=False).headers["location"] == "/pin"
+    assert naming.ask(conn, face) is not None

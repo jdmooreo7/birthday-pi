@@ -111,7 +111,7 @@ def answer(conn: sqlite3.Connection, face_id: int, yes: bool) -> None:
 def person_faces(conn: sqlite3.Connection, person_id: int) -> list[sqlite3.Row]:
     """Every face named as this person, in approved photos, clearest first."""
     return conn.execute(
-        "SELECT f.id, f.group_id FROM faces f JOIN face_groups g ON g.id = f.group_id "
+        "SELECT f.id, f.group_id, f.confirmed FROM faces f JOIN face_groups g ON g.id = f.group_id "
         "JOIN photos ph ON ph.id = f.photo_id AND ph.status = 'approved' "
         "WHERE g.person_id = ? ORDER BY f.score DESC, f.id", (person_id,)).fetchall()
 

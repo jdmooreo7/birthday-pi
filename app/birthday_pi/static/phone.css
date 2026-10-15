@@ -111,3 +111,13 @@ input:focus, select:focus, .btn:focus-visible, .choice:focus-visible, a:focus-vi
 .avatar.huge { width: 88px; height: 88px; font-size: 40px; background: var(--accent); color: #fff; }
 .facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .facts > div { display: flex; flex-direction: column; gap: 2px; }
+/* M7: "Is this Leo?" and "Is this all Leo?" */
+.ask-face { width: 200px; height: 200px; border-radius: 50%; object-fit: cover; border: 4px solid var(--card); background: var(--line);
+  box-shadow: 0 2px 12px rgba(43, 43, 58, .12); }
+.ask-where { display: flex; flex-direction: row; align-items: center; gap: 12px; }
+.ask-photo { position: relative; flex-shrink: 0; width: 96px; line-height: 0; border-radius: 8px; overflow: hidden; }
+.ask-photo img { width: 100%; height: auto; display: block; }
+.ask-photo .ring { position: absolute; border: 3px solid var(--accent); border-radius: 50%; box-sizing: border-box; }
+.new-badge { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--accent); color: #fff;
+  font-size: 13px; font-weight: 700; line-height: 1.5; }
+.new-badge.on-tile { position: absolute; left: 4px; bottom: 4px; font-size: 11px; padding: 0 6px; }
