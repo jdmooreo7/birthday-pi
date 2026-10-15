@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}All the same person?{% endblock %}
+{% block content %}
+<div class="top">
+  <a href="/faces">Back</a>
+  {% if position %}<span class="muted small">Person {{ position }} of {{ total }}</span>{% endif %}
+</div>
+<div>
+  <h1>{% if group.name %}Is this all {{ group.name }}?{% else %}All the same person?{% endif %}</h1>
+  <p class="muted">In {{ group.photos }} photos. Tap any face that isn't them.</p>
+</div>
+<form method="post" action="/faces/{{ group.id }}">
+  <div class="face-grid">
+    {% for f in faces %}
+    <label class="face-tile">
+      <input type="checkbox" name="out" value="{{ f }}" aria-label="Face {{ loop.index }} of {{ faces | length }}: not them">
+      <img src="/face-files/{{ f }}.jpg" alt="" loading="lazy">
+      <span class="x" aria-hidden="true"></span>
+    </label>
+    {% endfor %}
+  </div>
+  <p class="muted small center">All {{ faces | length }} faces shown. Faces you take out are asked about separately.</p>
+  <button class="btn" type="submit" name="action" value="who">Who is this?</button>
+  <div class="row3">
+    <button class="btn secondary small-btn" type="submit" name="action" value="not_family">Not family</button>
+    <button class="btn secondary small-btn" type="submit" name="action" value="not_person">Not a person</button>
+    <a class="btn secondary small-btn" href="{{ '/faces/' ~ skip_to if skip_to else '/faces' }}">Skip</a>
+  </div>
+</form>
+{% endblock %}

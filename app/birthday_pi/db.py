@@ -54,13 +54,15 @@ CREATE TABLE IF NOT EXISTS photo_people (
 -- Faces the faces worker groups together as probably the same person.
 CREATE TABLE IF NOT EXISTS face_groups (
     id        INTEGER PRIMARY KEY,
-    person_id INTEGER REFERENCES people(id) ON DELETE SET NULL
+    person_id INTEGER REFERENCES people(id) ON DELETE SET NULL,  -- named by Grandma
+    ignored   TEXT  -- 'not_family' or 'not_person': never asked about again
 );
 -- Faces found in photos. Crops live in <data>/faces/<id>.jpg; embedding is 128 float32s from SFace.
 CREATE TABLE IF NOT EXISTS faces (
     id        INTEGER PRIMARY KEY,
     photo_id  TEXT NOT NULL REFERENCES photos(id) ON DELETE CASCADE,
-    group_id  INTEGER REFERENCES face_groups(id) ON DELETE SET NULL,
+    group_id  INTEGER REFERENCES face_groups(id) ON DELETE SET NULL,  -- NULL: waiting for the worker to place it
+    not_group INTEGER,  -- the group it was taken out of ("isn't them"), so the worker won't put it back
     x INTEGER NOT NULL, y INTEGER NOT NULL, w INTEGER NOT NULL, h INTEGER NOT NULL,
     score     REAL NOT NULL,
     embedding BLOB NOT NULL
@@ -103,9 +105,9 @@ def connect() -> sqlite3.Connection:
 
 def _migrate(conn: sqlite3.Connection) -> None:
     """Bring databases from earlier builds up to date. Runs before SCHEMA creates any missing tables."""
-    photo_cols = [r["name"] for r in conn.execute("PRAGMA table_info(photos)")]
-    if photo_cols and "faces_scanned" not in photo_cols:  # v0.1
-        conn.execute("ALTER TABLE photos ADD COLUMN faces_scanned INTEGER NOT NULL DEFAULT 0")
+    _add_column(conn, "photos", "faces_scanned", "INTEGER NOT NULL DEFAULT 0")  # v0.1
+    _add_column(conn, "face_groups", "ignored", "TEXT")  # M5
+    _add_column(conn, "faces", "not_group", "INTEGER")  # M5
     # Early M1 builds stored one anniversary per couple; keep it as person_a's wedding anniversary.
     cols = [r["name"] for r in conn.execute("PRAGMA table_info(anniversaries)")]
     if "person_a" in cols:
@@ -125,6 +127,13 @@ def _migrate(conn: sqlite3.Connection) -> None:
             DROP TABLE anniversaries_old;
             COMMIT;
         """)
+
+
+def _add_column(conn: sqlite3.Connection, table: str, column: str, decl: str) -> None:
+    """Adds a column to a table from an earlier build. A table that doesn't exist yet gets it from SCHEMA."""
+    cols = [r["name"] for r in conn.execute(f"PRAGMA table_info({table})")]
+    if cols and column not in cols:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
 
 
 def get_setting(conn: sqlite3.Connection, key: str, default: str | None = None) -> str | None:

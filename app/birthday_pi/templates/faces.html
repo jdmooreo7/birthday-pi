@@ -1,21 +1,45 @@
 {% extends "base.html" %}
-{% block title %}Faces found{% endblock %}
+{% block title %}Who's in your photos?{% endblock %}
 {% block content %}
 <div>
-  <h1>Faces found</h1>
-  <p class="muted">A testing page. The Pi groups faces it thinks are the same person. Naming them comes next.</p>
+  <h1>Who's in your photos?</h1>
+  {% set offered = todo | length + named_groups %}
+  {% if offered %}
+  <p class="muted">Birthday Pi found {{ offered }} {{ "person" if offered == 1 else "people" }} in {{ offered_at }} or more photos. Name them so their photos show on their day.</p>
+  {% else %}
+  <p class="muted">Nobody is in {{ offered_at }} or more photos yet. Add photos and Birthday Pi will find the faces in them.</p>
+  {% endif %}
 </div>
-{% if not running %}<div class="notice">The face finder isn't running. On the Pi, run <code>docker compose up -d</code>.</div>{% endif %}
-<p>Looked at {{ counts.scanned }} of {{ counts.photos }} photos · {{ faces }} faces · {{ groups | length }} groups</p>
-{% for g in groups %}
-<section class="list" aria-label="Group {{ loop.index }}">
-  <h2>{{ g.name or "Group " ~ loop.index }} <span class="muted small" style="font-weight: 400">· in {{ g.photos }} photo{{ "s" if g.photos != 1 }}{% if g.photos >= offered_at %} · will be asked about{% endif %}</span></h2>
-  <div class="thumbs">
-    {% for face_id in crops[g.group_id] %}<span><img src="/face-files/{{ face_id }}.jpg" alt="" loading="lazy"></span>{% endfor %}
+{% if not running %}<div class="notice">The face finder isn't running, so new photos aren't being looked at. On the Pi, run <code>docker compose up -d</code>.</div>{% endif %}
+{% if offered %}
+<div class="progress" role="group" aria-label="Naming progress">
+  <div class="progress-text"><span class="name">{{ named_groups }} of {{ offered }} named</span><span class="muted">{{ todo | length }} to go</span></div>
+  <div class="bar"><div style="width: {{ (100 * named_groups / offered) | round | int }}%"></div></div>
+</div>
+{% endif %}
+{% if todo %}
+<section class="list" aria-labelledby="todo-h">
+  <h2 id="todo-h">To name</h2>
+  <div class="groups">
+    {% for g in shown %}
+    <a class="group-row" href="/faces/{{ g.id }}">
+      <span class="face-strip">{% for f in strips[g.id] %}<img src="/face-files/{{ f }}.jpg" alt="">{% endfor %}</span>
+      <span class="grow"><span class="name">Not named yet</span><span class="muted small">In {{ g.photos }} photos</span></span>
+      <span class="go">Name</span>
+    </a>
+    {% endfor %}
+  </div>
+  {% if todo | length > shown | length %}<a class="btn quiet" href="/faces?all=1">Show {{ todo | length - shown | length }} more</a>{% endif %}
+</section>
+{% endif %}
+{% if named %}
+<section aria-labelledby="named-h">
+  <h2 id="named-h">Named</h2>
+  <div class="chips">
+    {% for p in named %}<a class="chip" href="/people/{{ p.id }}"><span class="avatar">{{ p.name[:1] | upper }}</span><span><b>{{ p.name }}</b> · {{ p.photos }}</span></a>{% endfor %}
   </div>
 </section>
-{% else %}
-<p class="muted">No faces in approved photos yet.</p>
-{% endfor %}
-<a class="btn quiet" href="/settings/date">Back</a>
+{% endif %}
+<p class="muted small">People in fewer than {{ offered_at }} photos aren't asked about. You can still tag anyone on a photo. Looked at {{ counts.scanned }} of {{ counts.photos }} photos so far.</p>
+<a class="btn quiet" href="/">Home</a>
 {% endblock %}

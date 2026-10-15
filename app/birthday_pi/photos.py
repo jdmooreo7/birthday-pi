@@ -117,6 +117,13 @@ def tags(conn: sqlite3.Connection, photo_id: str) -> set[int]:
     return {r[0] for r in conn.execute("SELECT person_id FROM photo_people WHERE photo_id = ?", (photo_id,))}
 
 
+def face_names(conn: sqlite3.Connection, photo_id: str) -> list[str]:
+    """People Grandma named among the faces in this photo."""
+    return [r[0] for r in conn.execute(
+        "SELECT DISTINCT p.name FROM faces f JOIN face_groups g ON g.id = f.group_id JOIN people p ON p.id = g.person_id "
+        "WHERE f.photo_id = ? ORDER BY p.name", (photo_id,))]
+
+
 def set_tags(conn: sqlite3.Connection, photo_id: str, person_ids: set[int]) -> None:
     conn.execute("DELETE FROM photo_people WHERE photo_id = ?", (photo_id,))
     conn.executemany(
@@ -134,10 +141,13 @@ def slideshow(conn: sqlite3.Connection, today: date) -> dict:
     rows = []
     if ids:
         marks = ",".join("?" * len(ids))
+        # Tagged by hand, or a face Grandma named.
         rows = conn.execute(
-            f"SELECT DISTINCT ph.id FROM photos ph JOIN photo_people pp ON pp.photo_id = ph.id "
-            f"WHERE {shown} AND pp.person_id IN ({marks})",
-            ids,
+            f"SELECT id FROM photos WHERE {shown} AND id IN ("
+            f" SELECT photo_id FROM photo_people WHERE person_id IN ({marks})"
+            f" UNION SELECT f.photo_id FROM faces f JOIN face_groups g ON g.id = f.group_id"
+            f"  WHERE g.person_id IN ({marks}))",
+            ids + ids,
         ).fetchall()
     if not rows:
         rows = conn.execute(f"SELECT id FROM photos WHERE {shown}").fetchall()

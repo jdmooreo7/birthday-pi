@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}That's {{ person.name }}{% endblock %}
+{% block content %}
+<div class="top">
+  <a href="/faces">All people</a>
+  <span class="muted small">{{ left }} left to name</span>
+</div>
+<div class="named-hero">
+  <span class="avatar huge">{{ person.name[:1] | upper }}</span>
+  <h1>That's {{ person.name }}</h1>
+  {% if before %}
+  {% set added = total - before %}
+  <p>{{ person.name }} is now in <b>{{ total }} photos</b>.{% if added %} {{ added }} more joined the {{ before }} already named {{ person.name }}.{% endif %}</p>
+  {% else %}
+  <p>{{ person.name }} is in <b>{{ total }} photo{{ "s" if total != 1 }}</b>.</p>
+  {% endif %}
+</div>
+<div class="card facts">
+  <div><span class="muted small">Birthday</span><span class="name">{{ birthday or "Not added yet" }}</span></div>
+  <div><span class="muted small">On {{ person.name }}'s day</span><span class="name">{{ total }} photo{{ "s" if total != 1 }} show</span></div>
+</div>
+{% if not birthday %}<a class="btn secondary" href="/people/{{ person.id }}">Add {{ person.name }}'s birthday</a>{% endif %}
+{% if next_group %}<a class="btn" href="/faces/{{ next_group }}">Next person</a>{% else %}<a class="btn" href="/faces">Everyone's named. See the list</a>{% endif %}
+<div class="row2">
+  <form method="post" action="/faces/{{ group.id }}/undo"><button class="btn secondary small-btn" type="submit">Undo, not {{ person.name }}</button></form>
+  <a class="btn secondary small-btn" href="/faces">Stop for now</a>
+</div>
+{% endblock %}

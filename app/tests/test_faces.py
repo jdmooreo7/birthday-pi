@@ -103,7 +103,7 @@ def test_v01_photos_table_gets_scanned_flag(tmp_path, monkeypatch):
     assert db.connect().execute("SELECT faces_scanned FROM photos").fetchone()[0] == 0
 
 
-def test_faces_page_shows_groups_from_approved_photos_only(set_up):
+def test_faces_page_offers_groups_from_approved_photos_only(set_up):
     client = set_up
     conn = db.connect()
     assert "The face finder isn't running" in client.get("/faces").text
@@ -114,8 +114,8 @@ def test_faces_page_shows_groups_from_approved_photos_only(set_up):
                                          "d" * 16: [_unit(0, 0, 1)]}))
     page = client.get("/faces").text
     assert "isn't running" not in page
-    assert "Looked at 4 of 4 photos · 5 faces · 2 groups" in page  # the pending photo's face isn't offered
-    assert page.index("in 3 photos · will be asked about") < page.index("in 1 photo<")
+    assert "found 1 person in 3 or more photos" in page  # the 1-photo group and the pending photo aren't offered
+    assert "0 of 1 named" in page and "In 3 photos" in page and "Looked at 4 of 4 photos" in page
     face_id = conn.execute("SELECT MIN(id) FROM faces").fetchone()[0]
     assert client.get(f"/face-files/{face_id}.jpg").content == b"crop"
 

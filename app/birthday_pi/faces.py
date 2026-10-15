@@ -124,16 +124,34 @@ def scan(conn: sqlite3.Connection, finder: Finder, photo_id: str, groups: Groups
     return len(found)
 
 
+def regroup(conn: sqlite3.Connection, groups: Groups) -> int:
+    """Places faces Grandma took out of a group ("isn't them"): never back in that group, nor in a group
+    another face in the same photo is already in. Returns how many were placed."""
+    loose = conn.execute("SELECT id, photo_id, not_group, embedding FROM faces WHERE group_id IS NULL ORDER BY id").fetchall()
+    for face in loose:
+        taken = {r[0] for r in conn.execute(
+            "SELECT group_id FROM faces WHERE photo_id = ? AND group_id IS NOT NULL", (face["photo_id"],))}
+        exclude = taken | ({face["not_group"]} if face["not_group"] else set())
+        conn.execute("BEGIN")
+        group_id = groups.assign(conn, from_blob(face["embedding"]), exclude)
+        conn.execute("UPDATE faces SET group_id = ? WHERE id = ?", (group_id, face["id"]))
+        conn.execute("COMMIT")
+    return len(loose)
+
+
 def scan_waiting(conn: sqlite3.Connection, finder: Finder) -> tuple[int, int]:
-    """Scans every photo not looked at yet, oldest first. Returns (photos, faces)."""
+    """Scans every photo not looked at yet, oldest first, then places any faces taken out of a group.
+    Returns (photos, faces found)."""
     todo = [r["id"] for r in conn.execute("SELECT id FROM photos WHERE faces_scanned = 0 ORDER BY created_at, id")]
-    if not todo:
+    loose = conn.execute("SELECT 1 FROM faces WHERE group_id IS NULL LIMIT 1").fetchone()
+    if not todo and not loose:
         return 0, 0
-    groups = Groups(conn)  # reloaded each round, since people can merge or split groups in the app
+    groups = Groups(conn)  # reloaded each round, since Grandma can take faces out of groups in the app
     faces = 0
     for photo_id in todo:
         faces += scan(conn, finder, photo_id, groups)
         db.set_setting(conn, HEARTBEAT, datetime.now().isoformat(timespec="seconds"))
+    regroup(conn, groups)
     return len(todo), faces
 
 

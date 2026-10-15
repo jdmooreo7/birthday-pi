@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 
-from . import db, devices, photos, pins, reminders
+from . import db, devices, naming, photos, pins, reminders
 from .dates import ANNIVERSARY_TYPES, MONTHS, how_far, missing_birthdays, short_date, upcoming, valid_month_day
 
 HERE = Path(__file__).parent
@@ -198,6 +198,7 @@ def home(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
         upcoming=upcoming(conn, now, within_days=COMING_UP_DAYS), missing=missing_birthdays(conn),
         people_count=people_count, trusted_owner=devices.is_trusted_owner(device),
         pending=photos.pending_count(conn),
+        to_name=len(naming.to_name(conn)) if devices.is_trusted_owner(device) else 0,
         my_pending=conn.execute("SELECT COUNT(*) FROM photos WHERE status = 'pending' AND uploader_id = ?",
                                 (device["person_id"],)).fetchone()[0],
     )
@@ -539,6 +540,7 @@ def photo_detail(photo_id: str, request: Request, conn: sqlite3.Connection = Dep
     people = conn.execute("SELECT id, name FROM people ORDER BY is_owner DESC, name").fetchall()
     return page(request, "photo_detail.html", device=device, photo=photo, people=people,
                 tagged=photos.tags(conn, photo_id), trusted_owner=devices.is_trusted_owner(device),
+                recognised=photos.face_names(conn, photo_id),
                 saved=request.query_params.get("saved") == "1")
 
 
@@ -590,34 +592,125 @@ def photo_file(name: str):
     return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=86400"})
 
 
-# ---------- Faces (M5 debug page; the faces worker fills these tables) ----------
+# ---------- Naming faces (M6): Grandma only; the faces worker fills the tables ----------
 
-FACES_OFFERED_AT = 3  # a face group is asked about once it's in this many photos
 FACE_WORKER_LATE = 60  # seconds without a heartbeat before the page says the worker isn't running
+TO_NAME_SHOWN = 4  # groups listed before "Show more"
+
+
+def _get_group(conn: sqlite3.Connection, group_id: int) -> sqlite3.Row:
+    g = naming.group(conn, group_id)
+    if g is None:
+        raise RedirectTo("/faces")
+    return g
 
 
 @app.get("/faces")
-def faces_page(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
-    """Face groups from approved photos, biggest first, as "Who is this?" will ask about them."""
+def faces_list(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    """Who's in your photos? Groups still to name, biggest first, then the people already named."""
     device = require_trusted_owner(conn, request)
-    groups = conn.execute(
-        "SELECT f.group_id, COUNT(DISTINCT f.photo_id) AS photos, COUNT(*) AS faces, p.name "
-        "FROM faces f JOIN photos ph ON ph.id = f.photo_id JOIN face_groups g ON g.id = f.group_id "
-        "LEFT JOIN people p ON p.id = g.person_id WHERE ph.status = 'approved' "
-        "GROUP BY f.group_id ORDER BY photos DESC, faces DESC, f.group_id"
-    ).fetchall()
-    crops = {}
-    for g in groups:
-        crops[g["group_id"]] = [r[0] for r in conn.execute(
-            "SELECT f.id FROM faces f JOIN photos ph ON ph.id = f.photo_id "
-            "WHERE f.group_id = ? AND ph.status = 'approved' ORDER BY f.score DESC LIMIT 6", (g["group_id"],))]
+    todo = naming.to_name(conn)
+    show_all = request.query_params.get("all") == "1"
+    shown = todo if show_all else todo[:TO_NAME_SHOWN]
+    strips = {g["id"]: naming.face_ids(conn, g["id"], limit=3) for g in shown}
+    named = naming.named_people(conn)
+    named_groups = conn.execute(
+        "SELECT COUNT(*) FROM (SELECT g.id FROM face_groups g JOIN faces f ON f.group_id = g.id "
+        "JOIN photos ph ON ph.id = f.photo_id AND ph.status = 'approved' WHERE g.person_id IS NOT NULL "
+        "GROUP BY g.id HAVING COUNT(DISTINCT f.photo_id) >= ?)", (naming.OFFERED_AT,)).fetchone()[0]
     counts = conn.execute(
         "SELECT COUNT(*) AS photos, COALESCE(SUM(faces_scanned), 0) AS scanned FROM photos").fetchone()
     beat = db.get_setting(conn, "faces_heartbeat")
     running = bool(beat) and (datetime.now() - datetime.fromisoformat(beat)).total_seconds() < FACE_WORKER_LATE
-    return page(request, "faces.html", device=device, groups=groups, crops=crops, counts=counts,
-                faces=conn.execute("SELECT COUNT(*) FROM faces").fetchone()[0], running=running,
-                offered_at=FACES_OFFERED_AT)
+    return page(request, "faces.html", device=device, todo=todo, shown=shown, strips=strips, named=named,
+                named_groups=named_groups, counts=counts, running=running, offered_at=naming.OFFERED_AT)
+
+
+@app.get("/faces/{group_id}")
+def face_group(group_id: int, request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    """All the same person? Every face in the group; Grandma ticks the ones that aren't them."""
+    device = require_trusted_owner(conn, request)
+    g = _get_group(conn, group_id)
+    todo = [t["id"] for t in naming.to_name(conn)]
+    return page(request, "face_group.html", device=device, group=g, faces=naming.face_ids(conn, group_id),
+                position=(todo.index(group_id) + 1) if group_id in todo else None, total=len(todo),
+                skip_to=naming.next_after(conn, group_id))
+
+
+@app.post("/faces/{group_id}")
+async def face_group_save(group_id: int, request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    """Takes out the ticked faces, then goes on to "Who is this?", or sets the group aside."""
+    require_trusted_owner(conn, request)
+    _get_group(conn, group_id)
+    form = await request.form()
+    out = []
+    for v in form.getlist("out"):
+        try:
+            out.append(int(v))
+        except ValueError:
+            pass
+    naming.take_out(conn, group_id, out)
+    action = str(form.get("action", ""))
+    if action in naming.IGNORE_REASONS:
+        naming.ignore(conn, group_id, action)
+        after = naming.next_after(conn, group_id)
+        return RedirectResponse(f"/faces/{after}" if after else "/faces", status_code=303)
+    return RedirectResponse(f"/faces/{group_id}/who", status_code=303)
+
+
+@app.get("/faces/{group_id}/who")
+def face_who(group_id: int, request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    device = require_trusted_owner(conn, request)
+    g = _get_group(conn, group_id)
+    people = conn.execute("SELECT * FROM people ORDER BY is_owner DESC, name").fetchall()
+    details = {}
+    for p in people:
+        bday = f"Birthday {MONTHS[p['birth_month'] - 1][:3]} {p['birth_day']}" if p["birth_month"] else "No birthday yet"
+        n = naming.photo_count(conn, p["id"])
+        details[p["id"]] = f"{bday} · " + (f"in {n} photo{'s' if n != 1 else ''}" if n else "no photos yet")
+    return page(request, "face_who.html", device=device, group=g, strip=naming.face_ids(conn, group_id, limit=3),
+                people=people, details=details, error=None)
+
+
+@app.post("/faces/{group_id}/who")
+async def face_who_save(group_id: int, request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    require_trusted_owner(conn, request)
+    _get_group(conn, group_id)
+    form = await request.form()
+    person_id = None
+    try:
+        person_id = int(form.get("person_id", ""))
+    except ValueError:
+        typed = str(form.get("new_name", "")).strip()
+        if typed and len(typed) <= 40:
+            person_id = naming.find_or_add_person(conn, typed)
+    if person_id is None or not conn.execute("SELECT 1 FROM people WHERE id = ?", (person_id,)).fetchone():
+        return RedirectResponse(f"/faces/{group_id}/who", status_code=303)
+    naming.name(conn, group_id, person_id)
+    return RedirectResponse(f"/faces/{group_id}/named", status_code=303)
+
+
+@app.get("/faces/{group_id}/named")
+def face_named(group_id: int, request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    """That's Mia: how many photos she's in now, and where to go next."""
+    device = require_trusted_owner(conn, request)
+    g = _get_group(conn, group_id)
+    if g["person_id"] is None:
+        return RedirectResponse(f"/faces/{group_id}", status_code=303)
+    person = conn.execute("SELECT * FROM people WHERE id = ?", (g["person_id"],)).fetchone()
+    birthday = f"{MONTHS[person['birth_month'] - 1]} {person['birth_day']}" if person["birth_month"] else None
+    return page(request, "face_named.html", device=device, group=g, person=person, birthday=birthday,
+                total=naming.photo_count(conn, person["id"]),
+                before=naming.photo_count(conn, person["id"], except_group=group_id),
+                left=len(naming.to_name(conn)), next_group=naming.next_after(conn, None))
+
+
+@app.post("/faces/{group_id}/undo")
+def face_undo(group_id: int, request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    require_trusted_owner(conn, request)
+    _get_group(conn, group_id)
+    naming.unname(conn, group_id)
+    return RedirectResponse(f"/faces/{group_id}/who", status_code=303)
 
 
 @app.get("/face-files/{face_id}.jpg")
