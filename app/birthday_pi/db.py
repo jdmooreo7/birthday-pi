@@ -87,11 +87,15 @@ def connect() -> sqlite3.Connection:
     path.mkdir(parents=True, exist_ok=True)
     # Autocommit: every statement is saved straight away. One connection per request, used by
     # one thread at a time, so it may be handed between FastAPI's worker threads.
-    conn = sqlite3.connect(path / "birthday-pi.db", isolation_level=None, check_same_thread=False)
+    # The app and the faces worker both write here. A busy SD card can take over 10 s to finish a write
+    # (seen in the M5 photo import), so wait up to 30 s for the other one rather than fail.
+    conn = sqlite3.connect(path / "birthday-pi.db", isolation_level=None, check_same_thread=False, timeout=30)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = WAL")
-    conn.execute("PRAGMA busy_timeout = 5000")  # the faces worker writes to the same file
+    # With WAL, NORMAL doesn't wait for the SD card on every save, only at checkpoints. A power cut can't
+    # corrupt the database; at worst the last moment's changes are lost. It also means less SD card wear.
+    conn.execute("PRAGMA synchronous = NORMAL")
     _migrate(conn)
     conn.executescript(SCHEMA)
     return conn
