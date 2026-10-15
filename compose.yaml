@@ -1,14 +1,25 @@
 # Birthday Pi. Start with: docker compose up -d
+# Optional live dashboards for whoever looks after the Pi: docker compose --profile observe up -d (see README).
+
+# Hardening shared by every container: no Linux capabilities, no privilege escalation, read-only filesystem.
+x-hardened: &hardened
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  read_only: true
+  restart: unless-stopped
+
 services:
   app:
+    <<: *hardened
     build: ./app
     image: birthday-pi:local
-    restart: unless-stopped
     ports:
       - "8080:8080"
     environment:
       # The address phones use to reach this Pi (shown as a QR code on the monitor).
       BIRTHDAY_PI_URL: ${BIRTHDAY_PI_URL:-http://birthdaypi.local:8080}
+      # Large photo uploads are buffered here (on the SD card), not in memory.
+      TMPDIR: /data/tmp
     volumes:
       - data:/data
       # Use the Pi's time zone so "today" matches the wall clock.
@@ -17,14 +28,94 @@ services:
 
   # Finds and groups faces in photos. Its own memory limit keeps a big import from starving the app or the monitor.
   faces:
+    <<: *hardened
     build:
       context: ./app
       dockerfile: Dockerfile.faces
     image: birthday-pi-faces:local
-    restart: unless-stopped
+    # Face data never leaves the Pi: this container has no network at all.
+    network_mode: none
     volumes:
       - data:/data
+      - /etc/localtime:/etc/localtime:ro
+    tmpfs: [/tmp:size=16m]
     mem_limit: 768m
+
+  # ---------- Observability (profile "observe", off unless asked for) ----------
+  # Netdata (live metrics and alerts) and Dozzle (live logs) sit on a network with no internet access,
+  # read Docker only through a read-only proxy, and are reached only through Caddy, which asks for a password.
+
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:v0.4.2
+    profiles: [observe]
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1  # list containers, read their logs and stats
+      EVENTS: 1
+      INFO: 1
+      POST: 0  # nothing can start, stop or change a container
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [observe]
+    mem_limit: 32m
+
+  netdata:
+    image: netdata/netdata:v2.12.0
+    profiles: [observe]
+    restart: unless-stopped
+    hostname: birthdaypi
+    pid: host  # to see the kiosk's Chromium, the biggest memory user on the Pi
+    environment:
+      DOCKER_HOST: tcp://docker-proxy:2375
+      DO_NOT_TRACK: 1
+      NETDATA_DISABLE_CLOUD: 1
+    volumes:
+      - ./observe/netdata.conf:/etc/netdata/netdata.conf:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /etc/os-release:/host/etc/os-release:ro
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
+      - /etc/localtime:/etc/localtime:ro
+    networks: [observe]
+    mem_limit: 384m
+
+  dozzle:
+    image: amir20/dozzle:v11.1.3
+    profiles: [observe]
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      DOCKER_HOST: tcp://docker-proxy:2375
+      DOZZLE_NO_ANALYTICS: "true"
+    tmpfs: [/data]
+    networks: [observe]
+    mem_limit: 64m
+
+  observe-gate:
+    image: caddy:2.11.7-alpine
+    profiles: [observe]
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    ports:
+      - "19999:19999"  # Netdata: live metrics and alerts
+      - "9080:9080"    # Dozzle: live container logs
+    environment:
+      OBSERVE_USER: ${OBSERVE_USER:-admin}
+      OBSERVE_PASSWORD_HASH: ${OBSERVE_PASSWORD_HASH:-}
+    volumes:
+      - ./observe/Caddyfile:/etc/caddy/Caddyfile:ro
+    tmpfs: [/data, /config]
+    networks: [observe, default]
+    mem_limit: 64m
+
+networks:
+  observe:
+    internal: true  # no route to the internet
 
 volumes:
   data:

@@ -24,4 +24,7 @@ COPY birthday_pi ./birthday_pi
 RUN useradd --uid 1000 --create-home app
 USER app
 
+# Unhealthy if the worker hasn't checked in for 2 minutes (it does every 10 seconds, and after every photo).
+HEALTHCHECK --interval=60s --timeout=10s --start-period=60s \
+  CMD python -m birthday_pi.faces --check
 CMD ["python", "-m", "birthday_pi.faces"]

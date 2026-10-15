@@ -7,6 +7,7 @@ It needs OpenCV and NumPy, which the app container doesn't have.
 import logging
 import os
 import sqlite3
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
@@ -21,6 +22,7 @@ MIN_SCORE = 0.8  # YuNet detection confidence
 MATCH = 0.363  # SFace cosine similarity for "same person" (OpenCV Zoo's threshold)
 POLL_SECONDS = 10
 HEARTBEAT = "faces_heartbeat"  # setting the app reads to tell whether the worker is running
+HEALTHY_WITHIN = 120  # seconds; the container is unhealthy if the heartbeat is older than this
 
 log = logging.getLogger("faces")
 
@@ -136,7 +138,19 @@ def scan_waiting(conn: sqlite3.Connection, finder: Finder) -> tuple[int, int]:
     return len(todo), faces
 
 
+def healthy() -> bool:
+    """For the container health check: has the worker written its heartbeat lately?"""
+    conn = db.connect()
+    try:
+        beat = db.get_setting(conn, HEARTBEAT)
+    finally:
+        conn.close()
+    return bool(beat) and (datetime.now() - datetime.fromisoformat(beat)).total_seconds() < HEALTHY_WITHIN
+
+
 def main() -> None:
+    if sys.argv[1:] == ["--check"]:
+        sys.exit(0 if healthy() else 1)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     os.nice(10)  # the monitor and the app come first
     finder = Finder()

@@ -80,7 +80,7 @@ cd ~/birthday-pi
 docker compose up -d
 ```
 
-The first run builds the app, which takes a few minutes on a Pi. Docker starts it again automatically whenever the Pi reboots.
+The first run builds two containers, the app and the face finder, which takes several minutes on a Pi. Docker starts them again automatically whenever the Pi reboots.
 
 ### Tell Birthday Pi its address
 
@@ -139,6 +139,30 @@ sudo reboot
 
 If the Pi doesn't boot, put the SD card in another computer and rename `cmdline.txt.bak` back to `cmdline.txt`.
 
+## Optional: watch it live (for whoever looks after the Pi)
+
+Two dashboards show what the Pi is doing right now: **Netdata** (memory, CPU, temperature and each container, second by second, with alerts) on port 19999, and **Dozzle** (live logs from each container) on port 9080. They're off unless you turn them on, use about 250–350 MB of memory, keep only the last hour of metrics in memory, and can't reach the internet.
+
+Both ask for a password. Make one once, from `~/birthday-pi`:
+
+```sh
+docker run --rm -it caddy:2.11.7-alpine caddy hash-password
+```
+
+Type a password when asked. It prints a long line starting with `$2a$`. Add it to the `.env` file in `~/birthday-pi` **inside single quotes**, so the `$` signs are kept:
+
+```sh
+OBSERVE_PASSWORD_HASH='$2a$14$...the line it printed...'
+```
+
+Then start everything with the dashboards:
+
+```sh
+docker compose --profile observe up -d
+```
+
+Open `http://birthdaypi.local:19999` (metrics) or `http://birthdaypi.local:9080` (logs) and sign in as `admin` with your password. To turn them off: `docker compose --profile observe down`, then `docker compose up -d`.
+
 ## Everyday commands
 
 Run these from `~/birthday-pi`:
@@ -162,6 +186,8 @@ Run these from `~/birthday-pi`:
 ## Your photos stay yours
 
 Names, dates and photos are kept in a Docker volume on the Pi, never in this repo. Photos are resized to screen size when they're added, and location and camera details are removed. Real family photos and face data are never committed (see `.gitignore`).
+
+The face finder works out who is in each photo on the Pi itself. It runs with no network connection at all, so faces can't be sent anywhere. Removing everything (`docker compose down -v`) deletes the photos and the face data with them.
 
 ## License
 

@@ -21,6 +21,10 @@ HERE = Path(__file__).parent
 COMING_UP_DAYS = 60  # "Coming up" lists only celebrations this many days ahead
 PUBLIC_URL = os.environ.get("BIRTHDAY_PI_URL", "http://birthdaypi.local:8080").rstrip("/")
 
+# The container's filesystem is read-only; uploads are buffered in TMPDIR on the data volume (see compose.yaml).
+if os.environ.get("TMPDIR"):
+    Path(os.environ["TMPDIR"]).mkdir(parents=True, exist_ok=True)
+
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 templates = Jinja2Templates(directory=HERE / "templates")
@@ -607,8 +611,8 @@ def faces_page(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
 
 @app.get("/face-files/{face_id}.jpg")
 def face_file(face_id: int, request: Request, conn: sqlite3.Connection = Depends(get_conn)):
-    """Face ids count up, so unlike photos the crops need a chosen device to see them."""
-    require_device(conn, request)
+    """Face data is Grandma's to see: only her trusted devices get the crops (face ids are guessable)."""
+    require_trusted_owner(conn, request)
     path = photos.face_crop_path(face_id)
     if not path.exists():
         return Response(status_code=404)

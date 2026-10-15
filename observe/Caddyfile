@@ -1,0 +1,22 @@
+# The password gate in front of the observability dashboards (compose profile "observe").
+# OBSERVE_PASSWORD_HASH comes from .env; see "Watch it live" in the README.
+{
+	admin off
+	auto_https off
+}
+
+(gate) {
+	basic_auth {
+		{$OBSERVE_USER} {$OBSERVE_PASSWORD_HASH}
+	}
+}
+
+:19999 {
+	import gate
+	reverse_proxy netdata:19999
+}
+
+:9080 {
+	import gate
+	reverse_proxy dozzle:8080
+}

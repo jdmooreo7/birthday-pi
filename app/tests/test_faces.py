@@ -120,7 +120,18 @@ def test_faces_page_shows_groups_from_approved_photos_only(set_up):
     assert client.get(f"/face-files/{face_id}.jpg").content == b"crop"
 
 
-def test_face_crops_need_a_chosen_device(client):
+def test_face_crops_are_only_for_grandmas_devices(client):
     client.post("/setup", data={"owner_name": "Grandma", "pin": "2468", "pin2": "2468"})
     client.cookies.clear()
-    assert client.get("/face-files/1.jpg", follow_redirects=False).status_code == 303
+    assert client.get("/face-files/1.jpg", follow_redirects=False).headers["location"] == "/who"
+    client.post("/who", data={"new_name": "Dana"})
+    assert client.get("/face-files/1.jpg", follow_redirects=False).headers["location"] == "/pin"
+
+
+def test_health_check_follows_the_heartbeat(conn):
+    assert not faces.healthy()
+    db.set_setting(conn, faces.HEARTBEAT, "2020-01-01T00:00:00")
+    assert not faces.healthy()
+    from datetime import datetime
+    db.set_setting(conn, faces.HEARTBEAT, datetime.now().isoformat(timespec="seconds"))
+    assert faces.healthy()
