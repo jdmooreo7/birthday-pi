@@ -172,7 +172,8 @@ Run these from `~/birthday-pi`:
 | See what's running | `docker compose ps` |
 | Stop it | `docker compose down` |
 | Start it again | `docker compose up -d` |
-| Update to the latest version | `git pull`, then `docker compose up -d --build` |
+| Update to the latest version | `scripts/update.sh` (goes back to the previous version by itself if anything isn't healthy afterwards) |
+| Save what's going on before a reboot, for whoever helps you | `scripts/diag.sh` (logs and numbers only, kept on the Pi in `~/birthday-pi-diag`) |
 | Grandma forgot her PIN | `docker compose exec app python -m birthday_pi.cli reset-pin` (her phones will ask for the new PIN) |
 
 ## Troubleshooting

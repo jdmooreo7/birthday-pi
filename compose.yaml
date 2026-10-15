@@ -96,7 +96,7 @@ services:
       DOZZLE_NO_ANALYTICS: "true"
     tmpfs: [/data]
     networks: [observe]
-    mem_limit: 64m
+    mem_limit: 96m  # peaked at 46 MB; it grows while someone reads logs
 
   observe-gate:
     image: caddy:2.11.7-alpine
@@ -117,7 +117,7 @@ services:
       - ./observe/Caddyfile:/etc/caddy/Caddyfile:ro
     tmpfs: [/data, /config]
     networks: [observe, default]
-    mem_limit: 64m
+    mem_limit: 96m  # peaked at 50 MB: checking a password is deliberately memory-heavy
 
 networks:
   observe:
