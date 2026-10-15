@@ -318,7 +318,7 @@ def _parse_person_form(form) -> tuple[dict, dict, dict]:
         count = 0
     keys = ["name", "birth_month", "birth_day", "birth_year"]
     for i in range(count):
-        keys += [f"ann_{i}_kind", f"ann_{i}_month", f"ann_{i}_day", f"ann_{i}_year"]
+        keys += [f"ann_{i}_kind", f"ann_{i}_month", f"ann_{i}_day", f"ann_{i}_year", f"ann_{i}_remove"]
     values = {k: str(form.get(k, "")).strip() for k in keys}
     errors: dict[str, str] = {}
     this_year = today().year
@@ -352,6 +352,8 @@ def _parse_person_form(form) -> tuple[dict, dict, dict]:
 
     for i in range(count):
         prefix = f"ann_{i}"
+        if values[f"{prefix}_remove"]:
+            continue
         month, day, year = date_parts(prefix, this_year + FUTURE_YEARS)  # e.g. a graduation next year
         if month is None and day is None and year is None:
             continue  # a blank row, or one cleared to remove it

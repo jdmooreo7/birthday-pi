@@ -121,14 +121,7 @@ def slideshow(conn: sqlite3.Connection, today: date) -> dict:
     """Photos on the screen: on someone's day only photos with them in, otherwise every approved photo."""
     celebrating = upcoming(conn, today, within_days=0)
     names = [c.name for c in celebrating]
-    ids = []
-    for c in celebrating:
-        if c.kind == "birthday":
-            ids.append(int(c.source[1:]))
-        else:
-            row = conn.execute("SELECT person_id FROM anniversaries WHERE id = ?", (int(c.source[1:]),)).fetchone()
-            if row:
-                ids.append(row[0])
+    ids = [pid for c in celebrating for pid in c.person_ids]
     shown = "status = 'approved' AND hidden = 0"
     rows = []
     if ids:

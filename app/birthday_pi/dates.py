@@ -56,6 +56,7 @@ class Celebration:
     source: str = ""  # "p<id>" for a birthday, "a<id>" for an anniversary
     event: str = ""  # e.g. "birthday", "wedding anniversary", "graduation"
     extra: str = ""  # e.g. "turns 7", "12 years"
+    person_ids: tuple[int, ...] = ()
 
 
 def upcoming(conn: sqlite3.Connection, today: date, within_days: int | None = None,
@@ -69,9 +70,14 @@ def upcoming(conn: sqlite3.Connection, today: date, within_days: int | None = No
             extra = f"turns {when.year - p['birth_year']}"
         detail = f"Birthday · {extra}" if extra else "Birthday"
         items.append(Celebration("birthday", p["name"], when, (when - today).days, detail, p["name"][:1].upper(),
-                                 f"p{p['id']}", "birthday", extra))
-    rows = conn.execute("SELECT a.*, p.name FROM anniversaries a JOIN people p ON p.id = a.person_id")
-    for a in rows:
+                                 f"p{p['id']}", "birthday", extra, (p["id"],)))
+    # People sharing the same anniversary (a couple's wedding) celebrate once, together: "Dana & Sam".
+    together: dict[tuple, list[sqlite3.Row]] = {}
+    for a in conn.execute("SELECT a.*, p.name FROM anniversaries a JOIN people p ON p.id = a.person_id ORDER BY a.id"):
+        together.setdefault((a["kind"], a["month"], a["day"], a["year"]), []).append(a)
+    for group in together.values():
+        a = group[0]
+        name = " & ".join(dict.fromkeys(g["name"] for g in group))
         when = next_occurrence(a["month"], a["day"], today)
         if a["year"] and when.year < a["year"]:
             when = occurrence(a["month"], a["day"], a["year"])  # a future date: nothing to celebrate before it
@@ -85,8 +91,8 @@ def upcoming(conn: sqlite3.Connection, today: date, within_days: int | None = No
         detail = event[:1].upper() + event[1:] + (" day" if event == label.lower() else "")
         if extra:
             detail += f" · {extra}"
-        items.append(Celebration("anniversary", a["name"], when, (when - today).days, detail, a["name"][:1].upper(),
-                                 f"a{a['id']}", event, extra))
+        items.append(Celebration("anniversary", name, when, (when - today).days, detail, name[:1].upper(),
+                                 f"a{a['id']}", event, extra, tuple(g["person_id"] for g in group)))
     if within_days is not None:
         items = [c for c in items if c.days_away <= within_days]
     items.sort(key=lambda c: (c.when, c.name))

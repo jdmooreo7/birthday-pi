@@ -27,9 +27,10 @@
         {% if errors[prefix ~ '_kind'] %}<div class="error">{{ errors[prefix ~ '_kind'] }}</div>{% endif %}
       </div>
       {% include "_date_fields.html" %}
+      {% if values[prefix ~ '_month'] and not loop.last %}<label class="check"><input type="checkbox" name="{{ prefix }}_remove" value="1"{% if values[prefix ~ '_remove'] %} checked{% endif %}> Remove this anniversary</label>{% endif %}
     </div>
     {% endfor %}
-    <p class="muted small">To add another, save first. To remove one, set its month to "–".</p>
+    <p class="muted small">To add another, save first.</p>
   </fieldset>
   <button class="btn" type="submit">Save</button>
 </form>
