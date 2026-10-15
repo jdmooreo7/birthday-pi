@@ -76,6 +76,14 @@ Read on our Pi with values hidden; only the shape of each line was looked at.
 - **Netdata:** numbers, container and process names only.
 - **Conditions:** `diag.sh` never collects `.env`, `docker inspect` settings (they hold the dashboard password hash) or `docker compose config`; its files are owner-only and stay on the Pi. Passed.
 
+## Privacy and access (Security Analyst)
+- **Her photos and face data never leave her house.** Pilot notes hold only counts and observations, no names, dates, photos or screenshots of her family.
+- **Consent first:** the adults in her family say OK to face recognition before any photos go in, and parents say it for children. Remove person is the answer for anyone who'd rather not be included.
+- **Network:** home Wi-Fi only, no port forwarding, no away-from-home access. She lives next door, so a fix means a visit.
+- **SSH:** keys only, with a new key used just for this Pi, and password login off from the start, as on our Pi. `unattended-upgrades` is on.
+- **PIN:** she picks it herself, and we don't write it down. A forgotten PIN is reset with the command in the README, on a visit.
+- **Accepted risk:** the PIN is sent over plain HTTP on her Wi-Fi (accepted for v1 at home). If her Wi-Fi is shared with lodgers or neighbours, we should talk about it before going ahead.
+
 ## Decided (2026-10-15)
 - The pilot Grandma is someone other than the PO's own family, who lives next door; when is still to be chosen.
 - A dedicated, always-on monitor, as on our Pi.
