@@ -141,7 +141,7 @@ If the Pi doesn't boot, put the SD card in another computer and rename `cmdline.
 
 ## Optional: watch it live (for whoever looks after the Pi)
 
-Two dashboards show what the Pi is doing right now: **Netdata** (memory, CPU, temperature and each container, second by second, with alerts) on port 19999, and **Dozzle** (live logs from each container) on port 9080. They're off unless you turn them on, use about 250–350 MB of memory, keep only the last hour of metrics in memory, and can't reach the internet.
+Two dashboards show what the Pi is doing right now: **Netdata** (memory, CPU, temperature and each container, second by second, with alerts) on port 19999, and **Dozzle** (live logs from each container) on port 9080. They're off unless you turn them on, use about 250–350 MB of memory, keep only the last hour of metrics in memory, and can't reach the internet. They also take about **1.6 GB of disk** for their images (Netdata alone is 1.3 GB), on top of about 0.8 GB for Birthday Pi itself, so leave room on the SD card.
 
 Both ask for a password. Make one once, from `~/birthday-pi`:
 
@@ -161,7 +161,7 @@ Then start everything with the dashboards:
 docker compose --profile observe up -d
 ```
 
-Open `http://birthdaypi.local:19999` (metrics) or `http://birthdaypi.local:9080` (logs) and sign in as `admin` with your password. To turn them off: `docker compose --profile observe down`, then `docker compose up -d`.
+Open `http://birthdaypi.local:19999` (metrics) or `http://birthdaypi.local:9080` (logs) and sign in as `admin` with your password. To turn them off: `docker compose --profile observe down`, then `docker compose up -d`. Turning them off doesn't free the disk space; to get it back, also run `docker image rm netdata/netdata:v2.12.0 amir20/dozzle:v11.1.3 caddy:2.11.7-alpine tecnativa/docker-socket-proxy:v0.4.2`.
 
 ## Everyday commands
 
