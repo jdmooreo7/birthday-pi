@@ -17,6 +17,7 @@
     {% else %}<button class="btn secondary" type="submit" name="action" value="hide">Hide from the screen</button>
     <p class="muted small">Hidden photos stay on the Pi. You can show them again any time.</p>{% endif %}
   </form>
+  <a class="btn quiet" href="/photos/{{ photo.id }}/delete">Delete from Birthday Pi</a>
   {% endif %}
 {% endif %}
 {% if recognised %}<p class="small"><span class="name">Found by face:</span> {{ recognised | join(", ") }}</p>{% endif %}

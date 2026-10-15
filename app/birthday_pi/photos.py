@@ -23,6 +23,10 @@ MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 MIN_FREE_BYTES = 2 * 1024**3  # refuse uploads when the SD card gets this full
 MAX_FILES_PER_UPLOAD = 50
 ID_PATTERN = re.compile(r"[0-9a-f]{16}")
+# A photo taken at the same second as one already on the Pi, whose fingerprint differs in at most this many
+# of 64 bits, is the same photo saved again (a phone re-saves photos when sharing them). Burst shots are
+# taken a second or more apart, so they're kept.
+SAME_LOOK_BITS = 6
 
 
 class UploadError(Exception):
@@ -47,6 +51,33 @@ def _taken_at(img: Image.Image) -> str | None:
         return None
 
 
+def look(img: Image.Image) -> int:
+    """A difference hash: 64 bits saying whether each pixel of a tiny grey copy is brighter than the next.
+    The same photo re-saved at another size or quality gives nearly the same bits. Signed, to fit SQLite."""
+    px = list(img.convert("L").resize((9, 8), Image.Resampling.LANCZOS).tobytes())
+    bits = sum(1 << i for i, (a, b) in enumerate((px[r * 9 + c], px[r * 9 + c + 1]) for r in range(8) for c in range(8)) if a > b)
+    return bits - (1 << 64) if bits >= 1 << 63 else bits
+
+
+def _same_photo(conn: sqlite3.Connection, img: Image.Image, taken: str | None) -> bool:
+    """Already on the Pi, saved again? Only photos with the same date taken are compared."""
+    if not taken:
+        return False
+    mine = look(img)
+    for row in conn.execute("SELECT id, look FROM photos WHERE taken_at = ?", (taken,)).fetchall():
+        theirs = row["look"]
+        if theirs is None:  # stored before fingerprints existed
+            try:
+                with Image.open(file_path(row["id"])) as old:
+                    theirs = look(old)
+            except OSError:
+                continue
+            conn.execute("UPDATE photos SET look = ? WHERE id = ?", (theirs, row["id"]))
+        if bin((mine ^ theirs) & (2**64 - 1)).count("1") <= SAME_LOOK_BITS:
+            return True
+    return False
+
+
 def save_upload(conn: sqlite3.Connection, data: bytes, uploader_id: int, approved: bool) -> str | None:
     """Store one uploaded photo. Returns its id, or None if it was already on the Pi."""
     if len(data) > MAX_UPLOAD_BYTES:
@@ -65,6 +96,8 @@ def save_upload(conn: sqlite3.Connection, data: bytes, uploader_id: int, approve
     except (OSError, ValueError, Image.DecompressionBombError):
         raise UploadError("isn't a photo Birthday Pi can read")
     img.thumbnail(SCREEN_BOX)
+    if _same_photo(conn, img, taken):
+        return None
     photo_id = secrets.token_hex(8)
     # Saved without EXIF, so no location or camera details stay on the Pi.
     img.save(file_path(photo_id), "JPEG", quality=85, optimize=True)
@@ -72,8 +105,8 @@ def save_upload(conn: sqlite3.Connection, data: bytes, uploader_id: int, approve
     thumb.thumbnail(THUMB_BOX)
     thumb.save(file_path(photo_id, thumb=True), "JPEG", quality=80)
     conn.execute(
-        "INSERT INTO photos (id, sha256, uploader_id, status, width, height, taken_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (photo_id, digest, uploader_id, "approved" if approved else "pending", img.width, img.height, taken),
+        "INSERT INTO photos (id, sha256, uploader_id, status, width, height, taken_at, look) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (photo_id, digest, uploader_id, "approved" if approved else "pending", img.width, img.height, taken, look(img)),
     )
     return photo_id
 

@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS photos (
     width       INTEGER,
     height      INTEGER,
     taken_at    TEXT,
+    look        INTEGER,  -- 64-bit picture fingerprint (photos.look), to spot the same photo saved again
     created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     faces_scanned INTEGER NOT NULL DEFAULT 0  -- set by the faces worker
 );
@@ -114,6 +115,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
         # Grandma looked at every face in the groups she named in M6.
         conn.execute("UPDATE faces SET confirmed = 1 WHERE group_id IN (SELECT id FROM face_groups WHERE person_id IS NOT NULL)")
     _add_column(conn, "faces", "ask_group", "INTEGER")  # M7
+    _add_column(conn, "photos", "look", "INTEGER")  # M7; filled in when a photo taken at the same moment arrives
     # Early M1 builds stored one anniversary per couple; keep it as person_a's wedding anniversary.
     cols = [r["name"] for r in conn.execute("PRAGMA table_info(anniversaries)")]
     if "person_a" in cols:

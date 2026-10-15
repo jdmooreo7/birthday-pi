@@ -485,7 +485,7 @@ def photo_list(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
             ("On the screen", photos.listing(conn, "status = 'approved' AND hidden = 0")),
         ]
     return page(request, "photos.html", device=device, sections=sections, trusted_owner=trusted,
-                pending=photos.pending_count(conn))
+                pending=photos.pending_count(conn), deleted=request.query_params.get("deleted") == "1")
 
 
 @app.get("/photos/add")
@@ -588,6 +588,21 @@ async def photo_decision(photo_id: str, request: Request, conn: sqlite3.Connecti
     _decide(conn, photo_id, str(form.get("action", "")))
     back = str(form.get("back", ""))
     return RedirectResponse(back if back in ("/photos/review", "/photos") else "/photos", status_code=303)
+
+
+@app.get("/photos/{photo_id}/delete")
+def photo_delete_confirm(photo_id: str, request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    device = require_trusted_owner(conn, request)
+    return page(request, "photo_delete.html", device=device, photo=_get_photo(conn, photo_id))
+
+
+@app.post("/photos/{photo_id}/delete")
+def photo_delete(photo_id: str, request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    """Grandma only. The photo, its thumbnail and any faces found in it (crops and face data) go."""
+    require_trusted_owner(conn, request)
+    if photos.get(conn, photo_id):
+        photos.delete(conn, photo_id)
+    return RedirectResponse("/photos?deleted=1", status_code=303)
 
 
 @app.get("/photo-files/{name}")

@@ -127,3 +127,80 @@ def test_sample_family_has_tagged_photos(client, capsys):
 def test_photo_files_reject_odd_names(client):
     assert client.get("/photo-files/..%2Fbirthday-pi.db").status_code == 404
     assert client.get("/photo-files/abc.jpg").status_code == 404
+
+
+def scene(seed=1, taken=None, size=(2400, 1600), quality=90) -> bytes:
+    """A photo with some detail (so it has a fingerprint), optionally with the date it was taken."""
+    from PIL import ImageDraw
+    img = Image.new("RGB", (480, 320), "white")
+    d = ImageDraw.Draw(img)
+    for i in range(12):
+        x, y = (seed * 37 + i * 53) % 440, (seed * 91 + i * 29) % 280
+        d.ellipse((x, y, x + 40 + i * 3, y + 30 + i * 2), fill=((seed * 60 + i * 20) % 255, (i * 40) % 255, 120))
+    img = img.resize(size)
+    buf = io.BytesIO()
+    kwargs = {}
+    if taken:
+        e = Image.Exif()
+        e.get_ifd(0x8769)[36867] = taken
+        kwargs["exif"] = e.tobytes()
+    img.save(buf, "JPEG", quality=quality, **kwargs)
+    return buf.getvalue()
+
+
+def test_same_photo_saved_again_is_skipped(set_up):
+    client = set_up
+    upload(client, scene(1, "2026:08:18 09:34:26"))
+    # The phone re-saves it smaller and at another quality when sharing: different bytes, same photo.
+    r = upload(client, scene(1, "2026:08:18 09:34:26", size=(1200, 800), quality=70))
+    assert "No new photos" in r.text and "1 was already on the Pi" in r.text
+    assert db.connect().execute("SELECT COUNT(*) FROM photos").fetchone()[0] == 1
+
+
+def test_look_alikes_that_are_not_the_same_photo_are_kept(set_up):
+    client = set_up
+    upload(client, scene(1, "2026:08:18 09:34:26"))
+    r = upload(client,
+               scene(1, "2026:08:18 09:34:27"),  # a burst shot a second later
+               scene(2, "2026:08:18 09:34:26"),  # another picture from the same second
+               scene(1, size=(1200, 800), quality=70))  # no date taken: only identical files are skipped
+    assert "3 photos added" in r.text
+
+
+def test_photos_from_before_fingerprints_are_still_caught(set_up):
+    client = set_up
+    upload(client, scene(1, "2026:08:18 09:34:26"))
+    conn = db.connect()
+    conn.execute("UPDATE photos SET look = NULL")
+    assert "1 was already on the Pi" in upload(client, scene(1, "2026:08:18 09:34:26", quality=60)).text
+    assert conn.execute("SELECT look FROM photos").fetchone()[0] is not None
+
+
+def test_grandma_deletes_a_photo_and_its_faces(set_up):
+    client = set_up
+    upload(client, jpeg())
+    conn = db.connect()
+    pid = conn.execute("SELECT id FROM photos").fetchone()[0]
+    face = conn.execute("INSERT INTO faces (photo_id, x, y, w, h, score, embedding) VALUES (?, 0, 0, 1, 1, 0.9, x'00')",
+                        (pid,)).lastrowid
+    photos.face_crop_path(face).parent.mkdir(parents=True, exist_ok=True)
+    photos.face_crop_path(face).write_bytes(b"crop")
+    assert f'href="/photos/{pid}/delete"' in client.get(f"/photos/{pid}").text
+    assert "can't be undone" in client.get(f"/photos/{pid}/delete").text
+    r = client.post(f"/photos/{pid}/delete")
+    assert "Photo deleted." in r.text
+    assert conn.execute("SELECT COUNT(*) FROM photos").fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM faces").fetchone()[0] == 0
+    assert not photos.file_path(pid).exists() and not photos.file_path(pid, True).exists()
+    assert not photos.face_crop_path(face).exists()
+
+
+def test_deleting_photos_is_grandma_only(set_up):
+    client = set_up
+    upload(client, jpeg())
+    pid = db.connect().execute("SELECT id FROM photos").fetchone()[0]
+    as_visitor(client)
+    assert "/delete" not in client.get(f"/photos/{pid}").text
+    assert client.get(f"/photos/{pid}/delete", follow_redirects=False).headers["location"] == "/pin"
+    assert client.post(f"/photos/{pid}/delete", follow_redirects=False).headers["location"] == "/pin"
+    assert photos.get(db.connect(), pid) is not None
