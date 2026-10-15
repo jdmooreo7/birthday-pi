@@ -2,7 +2,7 @@
 
 A small, local-only family reminder screen for a Raspberry Pi 5. It runs in Docker on your home network and shows birthdays and reminders on a monitor.
 
-> **Status: early (milestone 3 of the first test release).** Birthday Pi can be set up from a phone, Grandma has a PIN, and the family can add people, birthdays and anniversaries. The monitor shows what's coming up and gift, card and call reminders, and family photos (approved by Grandma) cycle when it's idle. See the [build plan](docs/build-plan-v1.md). See [`docs/birthday_pi_storyboard.html`](docs/birthday_pi_storyboard.html) for the plan and [`docs/product-decisions.md`](docs/product-decisions.md) for decisions so far.
+> **Status: early (v0.1 released; v0.2 milestone 5 of 7).** Birthday Pi can be set up from a phone, Grandma has a PIN, and the family can add people, birthdays and anniversaries. The monitor shows what's coming up and gift, card and call reminders, and family photos (approved by Grandma) cycle when it's idle. New in v0.2 so far: the Pi finds faces in the photos and groups them by person, ready for naming. See the [build plan](docs/build-plan-v1.md). See [`docs/birthday_pi_storyboard.html`](docs/birthday_pi_storyboard.html) for the plan and [`docs/product-decisions.md`](docs/product-decisions.md) for decisions so far.
 >
 > Tested on a Raspberry Pi 5 (4 GB) with Raspberry Pi OS 64-bit (Debian 13 "trixie"), Docker 29 and Compose v5. Not yet tested starting from a blank SD card, so tell us if a step is missing (open an issue).
 
