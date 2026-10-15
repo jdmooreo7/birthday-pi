@@ -9,7 +9,7 @@ A small, local-only family reminder screen for a Raspberry Pi 5. It runs in Dock
 ## What you need
 
 **Hardware**
-- Raspberry Pi 5 with 4 GB RAM, a power supply, and a 32 GB (or larger) microSD card
+- Raspberry Pi 5 with 4 GB RAM, the official 27 W power supply, and a **high-endurance** microSD card of 32 GB or more (we use 64 GB). Birthday Pi runs all day, every day, and constant small writes wear out ordinary cards. Good choices: Samsung PRO Endurance or SanDisk High Endurance. Buy from a store you trust; fake cards are common online.
 - A home Wi-Fi or Ethernet connection. Everything stays on your home network, and nothing here talks to the outside world after setup.
 - Optional: a monitor and mouse (HDMI) if you want the full-screen display on the Pi itself. You can also just open the page from a laptop or phone on the same network.
 
