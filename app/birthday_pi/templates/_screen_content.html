@@ -28,7 +28,7 @@
   <div class="rcard{% if reminders | length == 1 %} single{% endif %}">
     <div class="rtext">
       <div class="rlabel">{{ r.label }}</div>
-      <div class="rhead" style="font-size: {{ (px / 10.8) | round(2) }}vh">{{ r.headline }}</div>
+      <div class="rhead" style="--px: {{ px }}">{{ r.headline }}</div>
       <div class="rsub">{{ r.sub }}</div>
     </div>
     <form method="post" action="/reminders/ack">
