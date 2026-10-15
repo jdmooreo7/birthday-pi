@@ -70,7 +70,8 @@ services:
     environment:
       DOCKER_HOST: tcp://docker-proxy:2375
       DO_NOT_TRACK: 1
-      NETDATA_DISABLE_CLOUD: 1
+      # Netdata v2 has no working switch to turn Netdata Cloud off. It's never claimed, and the
+      # "observe" network has no route to the internet, so it can't connect (checked 2026-10-15).
     volumes:
       - ./observe/netdata.conf:/etc/netdata/netdata.conf:ro
       - /proc:/host/proc:ro
