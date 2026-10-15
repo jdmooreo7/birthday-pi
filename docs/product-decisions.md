@@ -58,3 +58,4 @@ Decisions made by the Product Owner, newest last. The storyboard (`birthday_pi_s
 | 2026-10-15 | Backups scope: a whole-system copy on a USB stick, updated nightly, so recovery is "move the stick to a new Pi and switch it on" with as little interaction as possible from Grandma. The stick is unencrypted and treated like a house key. No data-only safety net in v0.3. Which release carries it is still to confirm. |
 | 2026-10-15 | Whole-system USB backup ("move the stick to a new Pi and switch it on") goes in v1.1. |
 | 2026-10-15 | M6 passed: the PO's usability check on the phone as Grandma (name a group as an existing person, name a second group as the same person, take out faces that aren't them, Undo). Next is M7. |
+| 2026-10-15 | The display page (`/screen`) gets a portrait layout for phones and tablets held upright; the monitor layout stays as is. Every usability check now includes a phone held upright. |
