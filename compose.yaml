@@ -74,6 +74,7 @@ services:
       # "observe" network has no route to the internet, so it can't connect (checked 2026-10-15).
     volumes:
       - ./observe/netdata.conf:/etc/netdata/netdata.conf:ro
+      - netdata-cache:/var/cache/netdata  # metrics history, kept through reboots and updates
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /etc/os-release:/host/etc/os-release:ro
@@ -124,3 +125,4 @@ networks:
 
 volumes:
   data:
+  netdata-cache:
