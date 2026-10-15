@@ -42,7 +42,8 @@ CREATE TABLE IF NOT EXISTS photos (
     width       INTEGER,
     height      INTEGER,
     taken_at    TEXT,
-    created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    faces_scanned INTEGER NOT NULL DEFAULT 0  -- set by the faces worker
 );
 -- Who's in each photo, tagged by hand.
 CREATE TABLE IF NOT EXISTS photo_people (
@@ -50,6 +51,22 @@ CREATE TABLE IF NOT EXISTS photo_people (
     person_id INTEGER NOT NULL REFERENCES people(id) ON DELETE CASCADE,
     PRIMARY KEY (photo_id, person_id)
 );
+-- Faces the faces worker groups together as probably the same person.
+CREATE TABLE IF NOT EXISTS face_groups (
+    id        INTEGER PRIMARY KEY,
+    person_id INTEGER REFERENCES people(id) ON DELETE SET NULL
+);
+-- Faces found in photos. Crops live in <data>/faces/<id>.jpg; embedding is 128 float32s from SFace.
+CREATE TABLE IF NOT EXISTS faces (
+    id        INTEGER PRIMARY KEY,
+    photo_id  TEXT NOT NULL REFERENCES photos(id) ON DELETE CASCADE,
+    group_id  INTEGER REFERENCES face_groups(id) ON DELETE SET NULL,
+    x INTEGER NOT NULL, y INTEGER NOT NULL, w INTEGER NOT NULL, h INTEGER NOT NULL,
+    score     REAL NOT NULL,
+    embedding BLOB NOT NULL
+);
+CREATE INDEX IF NOT EXISTS faces_group ON faces(group_id);
+CREATE INDEX IF NOT EXISTS faces_photo ON faces(photo_id);
 -- A phone or tablet that picked "who's using this". Only a hash of its cookie is stored.
 CREATE TABLE IF NOT EXISTS devices (
     token_hash    TEXT PRIMARY KEY,
@@ -74,13 +91,18 @@ def connect() -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = WAL")
-    conn.executescript(SCHEMA)
+    conn.execute("PRAGMA busy_timeout = 5000")  # the faces worker writes to the same file
     _migrate(conn)
+    conn.executescript(SCHEMA)
     return conn
 
 
 def _migrate(conn: sqlite3.Connection) -> None:
-    """Early M1 builds stored one anniversary per couple; keep it as person_a's wedding anniversary."""
+    """Bring databases from earlier builds up to date. Runs before SCHEMA creates any missing tables."""
+    photo_cols = [r["name"] for r in conn.execute("PRAGMA table_info(photos)")]
+    if photo_cols and "faces_scanned" not in photo_cols:  # v0.1
+        conn.execute("ALTER TABLE photos ADD COLUMN faces_scanned INTEGER NOT NULL DEFAULT 0")
+    # Early M1 builds stored one anniversary per couple; keep it as person_a's wedding anniversary.
     cols = [r["name"] for r in conn.execute("PRAGMA table_info(anniversaries)")]
     if "person_a" in cols:
         conn.executescript("""

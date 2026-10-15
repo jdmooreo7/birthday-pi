@@ -78,10 +78,18 @@ def save_upload(conn: sqlite3.Connection, data: bytes, uploader_id: int, approve
     return photo_id
 
 
+def face_crop_path(face_id: int) -> Path:
+    return data_dir() / "faces" / f"{face_id}.jpg"
+
+
 def delete(conn: sqlite3.Connection, photo_id: str) -> None:
+    """Removes the photo, its files, and any faces found in it."""
+    face_ids = [r[0] for r in conn.execute("SELECT id FROM faces WHERE photo_id = ?", (photo_id,))]
     conn.execute("DELETE FROM photos WHERE id = ?", (photo_id,))
     for thumb in (False, True):
         file_path(photo_id, thumb).unlink(missing_ok=True)
+    for face_id in face_ids:
+        face_crop_path(face_id).unlink(missing_ok=True)
 
 
 def get(conn: sqlite3.Connection, photo_id: str) -> sqlite3.Row | None:

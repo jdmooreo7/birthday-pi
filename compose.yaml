@@ -15,5 +15,16 @@ services:
       - /etc/localtime:/etc/localtime:ro
     mem_limit: 256m
 
+  # Finds and groups faces in photos. Its own memory limit keeps a big import from starving the app or the monitor.
+  faces:
+    build:
+      context: ./app
+      dockerfile: Dockerfile.faces
+    image: birthday-pi-faces:local
+    restart: unless-stopped
+    volumes:
+      - data:/data
+    mem_limit: 768m
+
 volumes:
   data:

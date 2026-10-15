@@ -575,6 +575,46 @@ def photo_file(name: str):
     return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=86400"})
 
 
+# ---------- Faces (M5 debug page; the faces worker fills these tables) ----------
+
+FACES_OFFERED_AT = 3  # a face group is asked about once it's in this many photos
+FACE_WORKER_LATE = 60  # seconds without a heartbeat before the page says the worker isn't running
+
+
+@app.get("/faces")
+def faces_page(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    """Face groups from approved photos, biggest first, as "Who is this?" will ask about them."""
+    device = require_trusted_owner(conn, request)
+    groups = conn.execute(
+        "SELECT f.group_id, COUNT(DISTINCT f.photo_id) AS photos, COUNT(*) AS faces, p.name "
+        "FROM faces f JOIN photos ph ON ph.id = f.photo_id JOIN face_groups g ON g.id = f.group_id "
+        "LEFT JOIN people p ON p.id = g.person_id WHERE ph.status = 'approved' "
+        "GROUP BY f.group_id ORDER BY photos DESC, faces DESC, f.group_id"
+    ).fetchall()
+    crops = {}
+    for g in groups:
+        crops[g["group_id"]] = [r[0] for r in conn.execute(
+            "SELECT f.id FROM faces f JOIN photos ph ON ph.id = f.photo_id "
+            "WHERE f.group_id = ? AND ph.status = 'approved' ORDER BY f.score DESC LIMIT 6", (g["group_id"],))]
+    counts = conn.execute(
+        "SELECT COUNT(*) AS photos, COALESCE(SUM(faces_scanned), 0) AS scanned FROM photos").fetchone()
+    beat = db.get_setting(conn, "faces_heartbeat")
+    running = bool(beat) and (datetime.now() - datetime.fromisoformat(beat)).total_seconds() < FACE_WORKER_LATE
+    return page(request, "faces.html", device=device, groups=groups, crops=crops, counts=counts,
+                faces=conn.execute("SELECT COUNT(*) FROM faces").fetchone()[0], running=running,
+                offered_at=FACES_OFFERED_AT)
+
+
+@app.get("/face-files/{face_id}.jpg")
+def face_file(face_id: int, request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    """Face ids count up, so unlike photos the crops need a chosen device to see them."""
+    require_device(conn, request)
+    path = photos.face_crop_path(face_id)
+    if not path.exists():
+        return Response(status_code=404)
+    return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=86400"})
+
+
 # ---------- Monitor: Grandma approves photos with her PIN ----------
 
 SCREEN_COOKIE = "bp_screen"

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Faces found{% endblock %}
+{% block content %}
+<div>
+  <h1>Faces found</h1>
+  <p class="muted">A testing page. The Pi groups faces it thinks are the same person. Naming them comes next.</p>
+</div>
+{% if not running %}<div class="notice">The face finder isn't running. On the Pi, run <code>docker compose up -d</code>.</div>{% endif %}
+<p>Looked at {{ counts.scanned }} of {{ counts.photos }} photos · {{ faces }} faces · {{ groups | length }} groups</p>
+{% for g in groups %}
+<section class="list" aria-label="Group {{ loop.index }}">
+  <h2>{{ g.name or "Group " ~ loop.index }} <span class="muted small" style="font-weight: 400">· in {{ g.photos }} photo{{ "s" if g.photos != 1 }}{% if g.photos >= offered_at %} · will be asked about{% endif %}</span></h2>
+  <div class="thumbs">
+    {% for face_id in crops[g.group_id] %}<span><img src="/face-files/{{ face_id }}.jpg" alt="" loading="lazy"></span>{% endfor %}
+  </div>
+</section>
+{% else %}
+<p class="muted">No faces in approved photos yet.</p>
+{% endfor %}
+<a class="btn quiet" href="/settings/date">Back</a>
+{% endblock %}
