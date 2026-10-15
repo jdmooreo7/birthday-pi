@@ -56,6 +56,27 @@ Reminders depend on the date, so waiting two weeks to test the card reminder isn
 - **When:** the Product Owner runs a short usability check at the end of every milestone (M1 to M4), then the full test after v0.1. Tests start with the sample family.
 - **How:** watch the first session in person; after that, a short check-in each week. The app keeps a simple local log of "Got it" times, which tells us how quickly reminders get noticed. It stays on the Pi.
 
+## Second test build (v0.2): face recognition
+v0.1 shipped on 2026-10-14 (tag `v0.1.0`). v0.2 adds photo-first onboarding from `features/photo-first-onboarding.md`.
+
+**How it's built (Tech Lead)**
+- **A second container, `faces`,** with OpenCV, YuNet (finds faces) and SFace (matches them), as in the 2026-10-13 spike. It shares the data volume with the app and has its own memory limit, so a big import can never starve the app or the kiosk. The app image stays small.
+- **The worker polls SQLite** for photos it hasn't scanned yet. It stores each face's box, a small crop and its embedding, then groups faces. No queue server.
+- **Grouping is incremental.** Each new face joins the nearest group if it's similar enough, otherwise it starts a new one. The spike's all-pairs clustering is fine for 20 photos but too slow for thousands.
+- **Recognition follows the product rules:** a group is offered as "Who is this?" once it appears in 3 photos, and a person is labelled automatically only once they have 3 verified faces. Hand tags count as verified.
+- **Budget:** the spike peaked at 529 MB and took 0.64 s per photo on the Pi, which works out at about 11 minutes per 1,000 photos. Proposed limit: 768 MB at a low CPU priority. The Pi has about 3 GB free with the kiosk running, so this fits. The first job is to measure it inside the limit.
+- **Photos are already screen-sized** (originals not kept), which matches the spike's input size, so accuracy should be the same.
+
+**Milestones**
+
+| # | Milestone | Done when |
+|---|---|---|
+| M5 | Faces found and grouped | The `faces` worker scans new and existing photos on the Pi within its memory limit. A debug page shows the face groups. Speed and memory are measured on 200+ real photos. |
+| M6 | "Who is this?" naming | The naming flow on the phone, biggest groups first: name, merge, "Not all the same person", Not family, Not a person, and ask for the birthday when a new person is named. Naming tags the photos, so the celebration-day slideshow uses them. |
+| M7 | Recognising later imports | New uploads are labelled for people with 3+ verified faces, and unsure matches ask "Is this Leo?". Corrections ("Not Mia") work on a person's page. Remove person deletes their face data. Then tag `v0.2.0`. |
+
+**Testing:** the sample family's drawn photos have no real faces, so M5 onward needs real family photos. Get the family's OK first (see Risks).
+
 ## Backlog (after v0.1)
 - Family tree that fills in as birthdays are added (`features/family-tree-progress.md`).
 - Integrations, phone alerts and text-message approval links (see `features/`).

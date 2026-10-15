@@ -42,3 +42,4 @@ Decisions made by the Product Owner, newest last. The storyboard (`birthday_pi_s
 | 2026-10-14 | On the monitor, Grandma's PIN unlocks photo approval for 10 minutes or until she taps Done. |
 | 2026-10-14 | The testing page also sets how long the monitor waits before photos (10 s, 30 s, 1 min, or the normal 5 min); a testing banner shows while it is shorter. |
 | 2026-10-14 | M1, M2 and M3 usability checks passed. Next: M4 (fresh install, 24-hour soak, tag v0.1.0). |
+| 2026-10-14 | M4 passed: outside testers installed from the README on their own Pis (install, phone view, feature tour) with no issues. The 24-hour soak was cut short at 8 hours to keep moving (33 samples: no restarts, no errors, app memory 46 → 81 MB, well under the 256 MB limit). A full soak runs again before v1. |
