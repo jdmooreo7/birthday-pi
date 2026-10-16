@@ -1,0 +1,16 @@
+{# Old browsers (e.g. a 2017 TV's) can't run these pages and would show a jumbled layout.
+   Swap the page for a plain message instead. Written in old-style JavaScript so they can run it.
+   "inset" arrived in Chrome 87 and Safari 14.1, after everything else the pages use. #}
+<script>
+(function () {
+  var ok = false;
+  try { ok = !!(window.CSS && CSS.supports && CSS.supports("inset", "0") && window.fetch); } catch (e) {}
+  if (ok) return;
+  document.body.innerHTML =
+    '<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:#1e1b2e;color:#fbf6ee;' +
+    'font-family:sans-serif;padding:10vh 8vw;font-size:4vh;line-height:1.4">' +
+    '<p style="font-size:7vh;font-weight:bold;margin:0 0 4vh">This web browser is too old for Birthday Pi</p>' +
+    '<p style="margin:0 0 3vh">On a TV, plug the Birthday Pi into the TV with an HDMI cable instead.</p>' +
+    '<p style="margin:0">On a phone or tablet, update it or use a newer one.</p></div>';
+})();
+</script>
