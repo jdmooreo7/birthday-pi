@@ -42,7 +42,9 @@ CREATE TABLE IF NOT EXISTS photos (
     width       INTEGER,
     height      INTEGER,
     taken_at    TEXT,
-    created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    look        INTEGER,  -- 64-bit picture fingerprint (photos.look), to spot the same photo saved again
+    created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    faces_scanned INTEGER NOT NULL DEFAULT 0  -- set by the faces worker
 );
 -- Who's in each photo, tagged by hand.
 CREATE TABLE IF NOT EXISTS photo_people (
@@ -50,6 +52,26 @@ CREATE TABLE IF NOT EXISTS photo_people (
     person_id INTEGER NOT NULL REFERENCES people(id) ON DELETE CASCADE,
     PRIMARY KEY (photo_id, person_id)
 );
+-- Faces the faces worker groups together as probably the same person.
+CREATE TABLE IF NOT EXISTS face_groups (
+    id        INTEGER PRIMARY KEY,
+    person_id INTEGER REFERENCES people(id) ON DELETE SET NULL,  -- named by Grandma
+    ignored   TEXT  -- 'not_family' or 'not_person': never asked about again
+);
+-- Faces found in photos. Crops live in <data>/faces/<id>.jpg; embedding is 128 float32s from SFace.
+CREATE TABLE IF NOT EXISTS faces (
+    id        INTEGER PRIMARY KEY,
+    photo_id  TEXT NOT NULL REFERENCES photos(id) ON DELETE CASCADE,
+    group_id  INTEGER REFERENCES face_groups(id) ON DELETE SET NULL,  -- NULL: waiting for the worker to place it
+    not_group INTEGER,  -- the group it was taken out of ("isn't them"), so the worker won't put it back
+    confirmed INTEGER NOT NULL DEFAULT 0,  -- Grandma saw it in a group she named (M7 counts these)
+    ask_group INTEGER,  -- a named group it may belong to: waiting for "Is this Leo?" (M7)
+    x INTEGER NOT NULL, y INTEGER NOT NULL, w INTEGER NOT NULL, h INTEGER NOT NULL,
+    score     REAL NOT NULL,
+    embedding BLOB NOT NULL
+);
+CREATE INDEX IF NOT EXISTS faces_group ON faces(group_id);
+CREATE INDEX IF NOT EXISTS faces_photo ON faces(photo_id);
 -- A phone or tablet that picked "who's using this". Only a hash of its cookie is stored.
 CREATE TABLE IF NOT EXISTS devices (
     token_hash    TEXT PRIMARY KEY,
@@ -70,17 +92,31 @@ def connect() -> sqlite3.Connection:
     path.mkdir(parents=True, exist_ok=True)
     # Autocommit: every statement is saved straight away. One connection per request, used by
     # one thread at a time, so it may be handed between FastAPI's worker threads.
-    conn = sqlite3.connect(path / "birthday-pi.db", isolation_level=None, check_same_thread=False)
+    # The app and the faces worker both write here. A busy SD card can take over 10 s to finish a write
+    # (seen in the M5 photo import), so wait up to 30 s for the other one rather than fail.
+    conn = sqlite3.connect(path / "birthday-pi.db", isolation_level=None, check_same_thread=False, timeout=30)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = WAL")
-    conn.executescript(SCHEMA)
+    # With WAL, NORMAL doesn't wait for the SD card on every save, only at checkpoints. A power cut can't
+    # corrupt the database; at worst the last moment's changes are lost. It also means less SD card wear.
+    conn.execute("PRAGMA synchronous = NORMAL")
     _migrate(conn)
+    conn.executescript(SCHEMA)
     return conn
 
 
 def _migrate(conn: sqlite3.Connection) -> None:
-    """Early M1 builds stored one anniversary per couple; keep it as person_a's wedding anniversary."""
+    """Bring databases from earlier builds up to date. Runs before SCHEMA creates any missing tables."""
+    _add_column(conn, "photos", "faces_scanned", "INTEGER NOT NULL DEFAULT 0")  # v0.1
+    _add_column(conn, "face_groups", "ignored", "TEXT")  # M5
+    _add_column(conn, "faces", "not_group", "INTEGER")  # M5
+    if _add_column(conn, "faces", "confirmed", "INTEGER NOT NULL DEFAULT 0"):  # M7
+        # Grandma looked at every face in the groups she named in M6.
+        conn.execute("UPDATE faces SET confirmed = 1 WHERE group_id IN (SELECT id FROM face_groups WHERE person_id IS NOT NULL)")
+    _add_column(conn, "faces", "ask_group", "INTEGER")  # M7
+    _add_column(conn, "photos", "look", "INTEGER")  # M7; filled in when a photo taken at the same moment arrives
+    # Early M1 builds stored one anniversary per couple; keep it as person_a's wedding anniversary.
     cols = [r["name"] for r in conn.execute("PRAGMA table_info(anniversaries)")]
     if "person_a" in cols:
         conn.executescript("""
@@ -99,6 +135,16 @@ def _migrate(conn: sqlite3.Connection) -> None:
             DROP TABLE anniversaries_old;
             COMMIT;
         """)
+
+
+def _add_column(conn: sqlite3.Connection, table: str, column: str, decl: str) -> bool:
+    """Adds a column to a table from an earlier build. A table that doesn't exist yet gets it from SCHEMA.
+    Returns whether it was added."""
+    cols = [r["name"] for r in conn.execute(f"PRAGMA table_info({table})")]
+    if cols and column not in cols:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+        return True
+    return False
 
 
 def get_setting(conn: sqlite3.Connection, key: str, default: str | None = None) -> str | None:

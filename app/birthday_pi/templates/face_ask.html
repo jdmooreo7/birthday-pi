@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}{% if q %}Is this {{ q.name }}?{% else %}All checked{% endif %}{% endblock %}
+{% block content %}
+<div class="top">
+  <a href="/">Home</a>
+  {% if q %}<span class="muted small">{{ left }} to check</span>{% endif %}
+</div>
+{% if q %}
+<div class="named-hero">
+  <img class="ask-face" src="/face-files/{{ q.id }}.jpg" alt="">
+  <h1>Is this {{ q.name }}?</h1>
+  <p class="muted">{% if face.uploader %}In a photo {{ face.uploader }} added{% else %}In a new photo{% endif %}</p>
+</div>
+<div class="card ask-where">
+  <span class="ask-photo"><img src="/photo-files/{{ face.photo_id }}-thumb.jpg" alt="">{% if ring %}<span class="ring" style="left: {{ ring.left }}%; top: {{ ring.top }}%; width: {{ ring.w }}%; height: {{ ring.h }}%"></span>{% endif %}</span>
+  <span class="muted small">The circled face in the photo. <a href="/photos/{{ face.photo_id }}">See the photo</a></span>
+</div>
+<form method="post" action="/faces/ask/{{ q.id }}?yes={{ yes }}">
+  <button class="btn" type="submit" name="action" value="yes">Yes, it's {{ q.name }}</button>
+  <div class="row2" style="margin-top: 10px">
+    <button class="btn secondary" type="submit" name="action" value="no">No</button>
+    <button class="btn secondary" type="submit" name="action" value="skip">Not sure, skip</button>
+  </div>
+</form>
+{% else %}
+<div class="named-hero">
+  <span class="avatar huge" aria-hidden="true">✓</span>
+  <h1>All checked</h1>
+  <p>{% if yes %}{{ yes }} face{{ "" if yes == 1 else "s" }} added. {% endif %}New photos of the people you've named are named by themselves from now on.{% if skipped %} {{ skipped }} you skipped will be asked again next time.{% endif %}</p>
+</div>
+<a class="btn" href="/">Back to home</a>
+{% endif %}
+{% endblock %}

@@ -32,6 +32,18 @@
 {% elif my_pending %}
 <div class="card"><span class="name">{{ my_pending }} of your photos {{ "is" if my_pending == 1 else "are" }} waiting for Grandma's OK</span></div>
 {% endif %}
+{% if to_check %}
+<a class="card" href="/faces/ask" style="text-decoration: none; color: inherit">
+  <span class="name">{{ to_check }} face{{ "" if to_check == 1 else "s" }} to check</span>
+  <span class="muted small">New photos: is this who Birthday Pi thinks it is?</span>
+</a>
+{% endif %}
+{% if to_name %}
+<a class="card" href="/faces" style="text-decoration: none; color: inherit">
+  <span class="name">{{ to_name }} {{ "person" if to_name == 1 else "people" }} to name in your photos</span>
+  <span class="muted small">Name them so their photos show on their day.</span>
+</a>
+{% endif %}
 <div class="row2">
   <a class="btn secondary" href="/photos/add">Add photos</a>
   <a class="btn secondary" href="/photos">Photos</a>

@@ -2,14 +2,14 @@
 
 A small, local-only family reminder screen for a Raspberry Pi 5. It runs in Docker on your home network and shows birthdays and reminders on a monitor.
 
-> **Status: early (milestone 3 of the first test release).** Birthday Pi can be set up from a phone, Grandma has a PIN, and the family can add people, birthdays and anniversaries. The monitor shows what's coming up and gift, card and call reminders, and family photos (approved by Grandma) cycle when it's idle. See the [build plan](docs/build-plan-v1.md). See [`docs/birthday_pi_storyboard.html`](docs/birthday_pi_storyboard.html) for the plan and [`docs/product-decisions.md`](docs/product-decisions.md) for decisions so far.
+> **Status: early (v0.1 released; v0.2 milestone 5 of 7).** Birthday Pi can be set up from a phone, Grandma has a PIN, and the family can add people, birthdays and anniversaries. The monitor shows what's coming up and gift, card and call reminders, and family photos (approved by Grandma) cycle when it's idle. New in v0.2 so far: the Pi finds faces in the photos and groups them by person, ready for naming. See the [build plan](docs/build-plan-v1.md). See [`docs/birthday_pi_storyboard.html`](docs/birthday_pi_storyboard.html) for the plan and [`docs/product-decisions.md`](docs/product-decisions.md) for decisions so far.
 >
 > Tested on a Raspberry Pi 5 (4 GB) with Raspberry Pi OS 64-bit (Debian 13 "trixie"), Docker 29 and Compose v5. Not yet tested starting from a blank SD card, so tell us if a step is missing (open an issue).
 
 ## What you need
 
 **Hardware**
-- Raspberry Pi 5 with 4 GB RAM, a power supply, and a 32 GB (or larger) microSD card
+- Raspberry Pi 5 with 4 GB RAM, the official 27 W power supply, and a **high-endurance** microSD card of 32 GB or more (we use 64 GB). Birthday Pi runs all day, every day, and constant small writes wear out ordinary cards. Good choices: Samsung PRO Endurance or SanDisk High Endurance. Buy from a store you trust; fake cards are common online.
 - A home Wi-Fi or Ethernet connection. Everything stays on your home network, and nothing here talks to the outside world after setup.
 - Optional: a monitor and mouse (HDMI) if you want the full-screen display on the Pi itself. You can also just open the page from a laptop or phone on the same network.
 
@@ -80,7 +80,7 @@ cd ~/birthday-pi
 docker compose up -d
 ```
 
-The first run builds the app, which takes a few minutes on a Pi. Docker starts it again automatically whenever the Pi reboots.
+The first run builds two containers, the app and the face finder, which takes several minutes on a Pi. Docker starts them again automatically whenever the Pi reboots.
 
 ### Tell Birthday Pi its address
 
@@ -139,6 +139,30 @@ sudo reboot
 
 If the Pi doesn't boot, put the SD card in another computer and rename `cmdline.txt.bak` back to `cmdline.txt`.
 
+## Optional: watch it live (for whoever looks after the Pi)
+
+Two dashboards show what the Pi is doing right now: **Netdata** (memory, CPU, temperature and each container, second by second, with alerts) on port 19999, and **Dozzle** (live logs from each container) on port 9080. They're off unless you turn them on, use about 250–350 MB of memory, keep only the last hour of metrics in memory, and can't reach the internet. They also take about **1.6 GB of disk** for their images (Netdata alone is 1.3 GB), on top of about 0.8 GB for Birthday Pi itself, so leave room on the SD card.
+
+Both ask for a password. Make one once, from `~/birthday-pi`:
+
+```sh
+docker run --rm -it caddy:2.11.7-alpine caddy hash-password
+```
+
+Type a password when asked. It prints a long line starting with `$2a$`. Add it to the `.env` file in `~/birthday-pi` **inside single quotes**, so the `$` signs are kept:
+
+```sh
+OBSERVE_PASSWORD_HASH='$2a$14$...the line it printed...'
+```
+
+Then start everything with the dashboards:
+
+```sh
+docker compose --profile observe up -d
+```
+
+Open `http://birthdaypi.local:19999` (metrics) or `http://birthdaypi.local:9080` (logs) and sign in as `admin` with your password. To turn them off: `docker compose --profile observe down`, then `docker compose up -d`. Turning them off doesn't free the disk space; to get it back, also run `docker image rm netdata/netdata:v2.12.0 amir20/dozzle:v11.1.3 caddy:2.11.7-alpine tecnativa/docker-socket-proxy:v0.4.2`.
+
 ## Everyday commands
 
 Run these from `~/birthday-pi`:
@@ -148,7 +172,8 @@ Run these from `~/birthday-pi`:
 | See what's running | `docker compose ps` |
 | Stop it | `docker compose down` |
 | Start it again | `docker compose up -d` |
-| Update to the latest version | `git pull`, then `docker compose up -d --build` |
+| Update to the latest version | `scripts/update.sh` (goes back to the previous version by itself if anything isn't healthy afterwards) |
+| Save what's going on before a reboot, for whoever helps you | `scripts/diag.sh` (logs and numbers only, kept on the Pi in `~/birthday-pi-diag`) |
 | Grandma forgot her PIN | `docker compose exec app python -m birthday_pi.cli reset-pin` (her phones will ask for the new PIN) |
 
 ## Troubleshooting
@@ -162,6 +187,8 @@ Run these from `~/birthday-pi`:
 ## Your photos stay yours
 
 Names, dates and photos are kept in a Docker volume on the Pi, never in this repo. Photos are resized to screen size when they're added, and location and camera details are removed. Real family photos and face data are never committed (see `.gitignore`).
+
+The face finder works out who is in each photo on the Pi itself. It runs with no network connection at all, so faces can't be sent anywhere. Removing everything (`docker compose down -v`) deletes the photos and the face data with them.
 
 ## License
 

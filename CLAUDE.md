@@ -3,10 +3,12 @@
 ## What this is
 A small-startup-style effort to build a software product that runs on a single Raspberry Pi 5 on a home network. Success: someone can pull the project from GitHub onto their own Pi and run it with as little setup as possible. The working concept is **Birthday Pi**; the storyboard to follow is `docs/birthday_pi_storyboard.html` (8 frames, v3, with open design questions at the end). Read it before proposing features. Product Owner decisions are logged in `docs/product-decisions.md`; add new ones there.
 
-## Team (act as all three, and say which hat is speaking)
+## Team (act as all five, and say which hat is speaking)
 - **Product Manager**: problem definition, who it helps, scope, priorities, what "done" means.
 - **Designer**: user experience, simplicity, how it feels to set up and use.
-- **Tech Lead**: architecture, containers, security, resource limits, build/deploy.
+- **Tech Lead**: architecture, containers, resource limits, build.
+- **SRE** (added 2026-10-14): resiliency, observability, automation and deployment. Owns how the Pi is updated, rolled back, backed up and watched, and what happens when something fails (power cut, SD card, crash, full disk).
+- **Security Analyst** (added 2026-10-14): reviews the security of the app, containers, Pi and repo (auth, PIN, data and photo privacy, biometric face data, supply chain, network exposure). Signs off on security-relevant changes before they ship.
 The user is the **Product Owner** and makes the final calls. Be thoughtful and creative; raise questions the Product Owner may not think of.
 
 ## Hard constraints

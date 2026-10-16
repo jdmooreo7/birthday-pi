@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Is this all {{ person.name }}?{% endblock %}
+{% block content %}
+<div class="top">
+  <a href="/people/{{ person.id }}">Back to {{ person.name }}</a>
+</div>
+<div>
+  <h1>Is this all {{ person.name }}?</h1>
+  <p class="muted">{{ person.name }} is in {{ photos }} photo{{ "" if photos == 1 else "s" }}. Tap any face that isn't {{ person.name }}.</p>
+</div>
+{% if faces | rejectattr("confirmed") | list %}<p class="muted small"><span class="new-badge">New</span> Named by Birthday Pi since you last looked</p>{% endif %}
+<form method="post" action="/people/{{ person.id }}/faces">
+  <div class="face-grid">
+    {% for f in faces %}
+    <label class="face-tile">
+      <input type="checkbox" name="out" value="{{ f.id }}" aria-label="Face {{ loop.index }} of {{ faces | length }}{% if not f.confirmed %}, new{% endif %}: not {{ person.name }}">
+      <img src="/face-files/{{ f.id }}.jpg" alt="" loading="lazy">
+      {% if not f.confirmed %}<span class="new-badge on-tile" aria-hidden="true">New</span>{% endif %}
+      <span class="x" aria-hidden="true"></span>
+    </label>
+    {% endfor %}
+  </div>
+  <p class="muted small center">All {{ faces | length }} faces shown. Faces you tap go back to "people to name".</p>
+  <button class="btn" type="submit">Save</button>
+</form>
+{% endblock %}

@@ -1,0 +1,3 @@
+# The faces worker (Dockerfile.faces). The app's own packages are in requirements.txt.
+opencv-python-headless==4.10.0.84
+numpy==2.1.3

@@ -4,6 +4,7 @@ import os
 import re
 import secrets
 import sqlite3
+import threading
 import time
 from datetime import date, datetime
 from pathlib import Path
@@ -13,13 +14,18 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.concurrency import run_in_threadpool
 
-from . import db, devices, photos, pins, reminders
+from . import db, devices, naming, photos, pins, reminders
 from .dates import ANNIVERSARY_TYPES, MONTHS, how_far, missing_birthdays, short_date, upcoming, valid_month_day
 
 HERE = Path(__file__).parent
 COMING_UP_DAYS = 60  # "Coming up" lists only celebrations this many days ahead
 PUBLIC_URL = os.environ.get("BIRTHDAY_PI_URL", "http://birthdaypi.local:8080").rstrip("/")
+
+# The container's filesystem is read-only; uploads are buffered in TMPDIR on the data volume (see compose.yaml).
+if os.environ.get("TMPDIR"):
+    Path(os.environ["TMPDIR"]).mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
@@ -192,6 +198,8 @@ def home(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
         upcoming=upcoming(conn, now, within_days=COMING_UP_DAYS), missing=missing_birthdays(conn),
         people_count=people_count, trusted_owner=devices.is_trusted_owner(device),
         pending=photos.pending_count(conn),
+        to_name=len(naming.to_name(conn)) if devices.is_trusted_owner(device) else 0,
+        to_check=len(naming.asking(conn)) if devices.is_trusted_owner(device) else 0,
         my_pending=conn.execute("SELECT COUNT(*) FROM photos WHERE status = 'pending' AND uploader_id = ?",
                                 (device["person_id"],)).fetchone()[0],
     )
@@ -318,7 +326,7 @@ def _parse_person_form(form) -> tuple[dict, dict, dict]:
         count = 0
     keys = ["name", "birth_month", "birth_day", "birth_year"]
     for i in range(count):
-        keys += [f"ann_{i}_kind", f"ann_{i}_month", f"ann_{i}_day", f"ann_{i}_year"]
+        keys += [f"ann_{i}_kind", f"ann_{i}_month", f"ann_{i}_day", f"ann_{i}_year", f"ann_{i}_remove"]
     values = {k: str(form.get(k, "")).strip() for k in keys}
     errors: dict[str, str] = {}
     this_year = today().year
@@ -352,6 +360,8 @@ def _parse_person_form(form) -> tuple[dict, dict, dict]:
 
     for i in range(count):
         prefix = f"ann_{i}"
+        if values[f"{prefix}_remove"]:
+            continue
         month, day, year = date_parts(prefix, this_year + FUTURE_YEARS)  # e.g. a graduation next year
         if month is None and day is None and year is None:
             continue  # a blank row, or one cleared to remove it
@@ -383,8 +393,12 @@ def _save_person(conn: sqlite3.Connection, person_id: int | None, c: dict) -> in
 
 
 def _person_page(request, conn, device, person, values, errors, status_code=200, welcome=False):
+    # Grandma can check the faces named as this person ("Is this all Leo?").
+    face_photos = naming.photo_count(conn, person["id"]) if person and devices.is_trusted_owner(device) \
+        and naming.person_faces(conn, person["id"]) else 0
     return page(request, "person_form.html", status_code, device=device, person=person, values=values,
-                errors=errors, welcome=welcome, this_year=today().year, ANNIVERSARY_TYPES=ANNIVERSARY_TYPES)
+                errors=errors, welcome=welcome, this_year=today().year, ANNIVERSARY_TYPES=ANNIVERSARY_TYPES,
+                face_photos=face_photos)
 
 
 @app.get("/people/new")
@@ -443,6 +457,9 @@ def person_remove(person_id: int, request: Request, conn: sqlite3.Connection = D
     require_device(conn, request)
     person = _get_person(conn, person_id)
     if not person["is_owner"]:
+        # Their face data goes too: a removed person is forgotten, not left waiting to be named again.
+        for face_id in naming.forget_person(conn, person_id):
+            photos.face_crop_path(face_id).unlink(missing_ok=True)
         conn.execute("DELETE FROM people WHERE id = ?", (person_id,))
     return RedirectResponse("/people", status_code=303)
 
@@ -468,13 +485,21 @@ def photo_list(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
             ("On the screen", photos.listing(conn, "status = 'approved' AND hidden = 0")),
         ]
     return page(request, "photos.html", device=device, sections=sections, trusted_owner=trusted,
-                pending=photos.pending_count(conn))
+                pending=photos.pending_count(conn), deleted=request.query_params.get("deleted") == "1")
 
 
 @app.get("/photos/add")
 def photo_add_form(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
     device = require_device(conn, request)
     return page(request, "photo_add.html", device=device, trusted_owner=devices.is_trusted_owner(device))
+
+
+UPLOAD_LOCK = threading.Lock()  # one photo resized at a time keeps memory under the 256 MB limit
+
+
+def _save_photo(conn: sqlite3.Connection, data: bytes, person_id: int, approved: bool) -> str | None:
+    with UPLOAD_LOCK:
+        return photos.save_upload(conn, data, person_id, approved)
 
 
 @app.post("/photos/add")
@@ -490,7 +515,8 @@ async def photo_add(request: Request, conn: sqlite3.Connection = Depends(get_con
         if not data:
             continue
         try:
-            photo_id = photos.save_upload(conn, data, device["person_id"], approved=trusted)
+            # Off the event loop, so the monitor and the health check keep answering during a big upload.
+            photo_id = await run_in_threadpool(_save_photo, conn, data, device["person_id"], trusted)
         except photos.UploadError as e:
             problems.append(f"{upload.filename or 'A photo'} {e}.")
             continue
@@ -522,6 +548,7 @@ def photo_detail(photo_id: str, request: Request, conn: sqlite3.Connection = Dep
     people = conn.execute("SELECT id, name FROM people ORDER BY is_owner DESC, name").fetchall()
     return page(request, "photo_detail.html", device=device, photo=photo, people=people,
                 tagged=photos.tags(conn, photo_id), trusted_owner=devices.is_trusted_owner(device),
+                recognised=photos.face_names(conn, photo_id),
                 saved=request.query_params.get("saved") == "1")
 
 
@@ -563,12 +590,225 @@ async def photo_decision(photo_id: str, request: Request, conn: sqlite3.Connecti
     return RedirectResponse(back if back in ("/photos/review", "/photos") else "/photos", status_code=303)
 
 
+@app.get("/photos/{photo_id}/delete")
+def photo_delete_confirm(photo_id: str, request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    device = require_trusted_owner(conn, request)
+    return page(request, "photo_delete.html", device=device, photo=_get_photo(conn, photo_id))
+
+
+@app.post("/photos/{photo_id}/delete")
+def photo_delete(photo_id: str, request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    """Grandma only. The photo, its thumbnail and any faces found in it (crops and face data) go."""
+    require_trusted_owner(conn, request)
+    if photos.get(conn, photo_id):
+        photos.delete(conn, photo_id)
+    return RedirectResponse("/photos?deleted=1", status_code=303)
+
+
 @app.get("/photo-files/{name}")
 def photo_file(name: str):
     """Photo ids are random, so only someone shown the page knows a photo's address."""
     m = re.fullmatch(r"([0-9a-f]{16})(-thumb)?\.jpg", name)
     path = photos.file_path(m.group(1), bool(m.group(2))) if m else None
     if path is None or not path.exists():
+        return Response(status_code=404)
+    return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=86400"})
+
+
+# ---------- Naming faces (M6): Grandma only; the faces worker fills the tables ----------
+
+FACE_WORKER_LATE = 60  # seconds without a heartbeat before the page says the worker isn't running
+TO_NAME_SHOWN = 4  # groups listed before "Show more"
+
+
+def _get_group(conn: sqlite3.Connection, group_id: int) -> sqlite3.Row:
+    g = naming.group(conn, group_id)
+    if g is None:
+        raise RedirectTo("/faces")
+    return g
+
+
+@app.get("/faces")
+def faces_list(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    """Who's in your photos? Groups still to name, biggest first, then the people already named."""
+    device = require_trusted_owner(conn, request)
+    todo = naming.to_name(conn)
+    show_all = request.query_params.get("all") == "1"
+    shown = todo if show_all else todo[:TO_NAME_SHOWN]
+    strips = {g["id"]: naming.face_ids(conn, g["id"], limit=3) for g in shown}
+    named = naming.named_people(conn)
+    named_groups = conn.execute(
+        "SELECT COUNT(*) FROM (SELECT g.id FROM face_groups g JOIN faces f ON f.group_id = g.id "
+        "JOIN photos ph ON ph.id = f.photo_id AND ph.status = 'approved' WHERE g.person_id IS NOT NULL "
+        "GROUP BY g.id HAVING COUNT(DISTINCT f.photo_id) >= ?)", (naming.OFFERED_AT,)).fetchone()[0]
+    counts = conn.execute(
+        "SELECT COUNT(*) AS photos, COALESCE(SUM(faces_scanned), 0) AS scanned FROM photos").fetchone()
+    beat = db.get_setting(conn, "faces_heartbeat")
+    running = bool(beat) and (datetime.now() - datetime.fromisoformat(beat)).total_seconds() < FACE_WORKER_LATE
+    return page(request, "faces.html", device=device, todo=todo, shown=shown, strips=strips, named=named,
+                named_groups=named_groups, counts=counts, running=running, offered_at=naming.OFFERED_AT)
+
+
+# "Is this Leo?" (M7): faces in new photos the faces worker wasn't sure about. Declared before
+# /faces/{group_id} so "ask" isn't read as a group id.
+@app.get("/faces/ask")
+def face_ask(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    device = require_trusted_owner(conn, request)
+    after, yes = (_int_param(request, k) for k in ("after", "yes"))
+    waiting = naming.asking(conn)
+    later = [a for a in waiting if a["id"] > after]
+    if not later:
+        return page(request, "face_ask.html", device=device, q=None, yes=yes, skipped=len(waiting))
+    q = later[0]
+    face = conn.execute("SELECT f.photo_id, f.x, f.y, f.w, f.h, ph.width, ph.height, p.name AS uploader "
+                        "FROM faces f JOIN photos ph ON ph.id = f.photo_id LEFT JOIN people p ON p.id = ph.uploader_id "
+                        "WHERE f.id = ?", (q["id"],)).fetchone()
+    ring = None
+    if face["width"] and face["height"]:
+        ring = {k: round(100 * v / face[d], 1) for k, v, d in (
+            ("left", face["x"], "width"), ("top", face["y"], "height"), ("w", face["w"], "width"), ("h", face["h"], "height"))}
+    return page(request, "face_ask.html", device=device, q=q, face=face, ring=ring, yes=yes, left=len(later))
+
+
+@app.post("/faces/ask/{face_id}")
+async def face_ask_save(face_id: int, request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    require_trusted_owner(conn, request)
+    form = await request.form()
+    action = str(form.get("action", ""))
+    yes = _int_param(request, "yes")
+    if naming.ask(conn, face_id) and action in ("yes", "no"):
+        naming.answer(conn, face_id, yes=action == "yes")
+        yes += action == "yes"
+    return RedirectResponse(f"/faces/ask?after={face_id}&yes={yes}", status_code=303)
+
+
+def _int_param(request: Request, key: str) -> int:
+    try:
+        return max(0, int(request.query_params.get(key, 0)))
+    except ValueError:
+        return 0
+
+
+@app.get("/faces/{group_id}")
+def face_group(group_id: int, request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    """All the same person? Every face in the group; Grandma ticks the ones that aren't them."""
+    device = require_trusted_owner(conn, request)
+    g = _get_group(conn, group_id)
+    todo = [t["id"] for t in naming.to_name(conn)]
+    return page(request, "face_group.html", device=device, group=g, faces=naming.face_ids(conn, group_id),
+                position=(todo.index(group_id) + 1) if group_id in todo else None, total=len(todo),
+                skip_to=naming.next_after(conn, group_id))
+
+
+@app.post("/faces/{group_id}")
+async def face_group_save(group_id: int, request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    """Takes out the ticked faces, then goes on to "Who is this?", or sets the group aside."""
+    require_trusted_owner(conn, request)
+    _get_group(conn, group_id)
+    form = await request.form()
+    out = []
+    for v in form.getlist("out"):
+        try:
+            out.append(int(v))
+        except ValueError:
+            pass
+    naming.take_out(conn, group_id, out)
+    action = str(form.get("action", ""))
+    if action in naming.IGNORE_REASONS:
+        naming.ignore(conn, group_id, action)
+        after = naming.next_after(conn, group_id)
+        return RedirectResponse(f"/faces/{after}" if after else "/faces", status_code=303)
+    return RedirectResponse(f"/faces/{group_id}/who", status_code=303)
+
+
+@app.get("/faces/{group_id}/who")
+def face_who(group_id: int, request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    device = require_trusted_owner(conn, request)
+    g = _get_group(conn, group_id)
+    people = conn.execute("SELECT * FROM people ORDER BY is_owner DESC, name").fetchall()
+    details = {}
+    for p in people:
+        bday = f"Birthday {MONTHS[p['birth_month'] - 1][:3]} {p['birth_day']}" if p["birth_month"] else "No birthday yet"
+        n = naming.photo_count(conn, p["id"])
+        details[p["id"]] = f"{bday} · " + (f"in {n} photo{'s' if n != 1 else ''}" if n else "no photos yet")
+    return page(request, "face_who.html", device=device, group=g, strip=naming.face_ids(conn, group_id, limit=3),
+                people=people, details=details, error=None)
+
+
+@app.post("/faces/{group_id}/who")
+async def face_who_save(group_id: int, request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    require_trusted_owner(conn, request)
+    _get_group(conn, group_id)
+    form = await request.form()
+    person_id = None
+    try:
+        person_id = int(form.get("person_id", ""))
+    except ValueError:
+        typed = str(form.get("new_name", "")).strip()
+        if typed and len(typed) <= 40:
+            person_id = naming.find_or_add_person(conn, typed)
+    if person_id is None or not conn.execute("SELECT 1 FROM people WHERE id = ?", (person_id,)).fetchone():
+        return RedirectResponse(f"/faces/{group_id}/who", status_code=303)
+    naming.name(conn, group_id, person_id)
+    return RedirectResponse(f"/faces/{group_id}/named", status_code=303)
+
+
+@app.get("/faces/{group_id}/named")
+def face_named(group_id: int, request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    """That's Mia: how many photos she's in now, and where to go next."""
+    device = require_trusted_owner(conn, request)
+    g = _get_group(conn, group_id)
+    if g["person_id"] is None:
+        return RedirectResponse(f"/faces/{group_id}", status_code=303)
+    person = conn.execute("SELECT * FROM people WHERE id = ?", (g["person_id"],)).fetchone()
+    birthday = f"{MONTHS[person['birth_month'] - 1]} {person['birth_day']}" if person["birth_month"] else None
+    return page(request, "face_named.html", device=device, group=g, person=person, birthday=birthday,
+                total=naming.photo_count(conn, person["id"]),
+                before=naming.photo_count(conn, person["id"], except_group=group_id),
+                left=len(naming.to_name(conn)), next_group=naming.next_after(conn, None))
+
+
+@app.post("/faces/{group_id}/undo")
+def face_undo(group_id: int, request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    require_trusted_owner(conn, request)
+    _get_group(conn, group_id)
+    naming.unname(conn, group_id)
+    return RedirectResponse(f"/faces/{group_id}/who", status_code=303)
+
+
+# "Is this all Leo?" (M7): every face named as someone, to take out the ones that aren't them.
+@app.get("/people/{person_id}/faces")
+def person_faces(person_id: int, request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    device = require_trusted_owner(conn, request)
+    person = _get_person(conn, person_id)
+    shown = naming.person_faces(conn, person_id)
+    if not shown:
+        return RedirectResponse(f"/people/{person_id}", status_code=303)
+    return page(request, "face_person.html", device=device, person=person, faces=shown,
+                photos=naming.photo_count(conn, person_id))
+
+
+@app.post("/people/{person_id}/faces")
+async def person_faces_save(person_id: int, request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    require_trusted_owner(conn, request)
+    _get_person(conn, person_id)
+    form = await request.form()
+    out = []
+    for v in form.getlist("out"):
+        try:
+            out.append(int(v))
+        except ValueError:
+            pass
+    naming.not_person(conn, person_id, out)
+    return RedirectResponse(f"/people/{person_id}", status_code=303)
+
+
+@app.get("/face-files/{face_id}.jpg")
+def face_file(face_id: int, request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    """Face data is Grandma's to see: only her trusted devices get the crops (face ids are guessable)."""
+    require_trusted_owner(conn, request)
+    path = photos.face_crop_path(face_id)
+    if not path.exists():
         return Response(status_code=404)
     return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=86400"})
 

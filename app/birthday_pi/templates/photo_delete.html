@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Delete this photo?{% endblock %}
+{% block content %}
+<img class="photo" src="/photo-files/{{ photo.id }}.jpg" alt="Photo added by {{ photo.uploader or 'someone' }}">
+<h1>Delete this photo?</h1>
+<p>It's removed from Birthday Pi and can't be undone. To keep it but stop showing it, use Hide.</p>
+<form method="post" action="/photos/{{ photo.id }}/delete">
+  <button class="btn danger" type="submit">Delete this photo</button>
+</form>
+<a class="btn quiet" href="/photos/{{ photo.id }}">Keep it</a>
+{% endblock %}

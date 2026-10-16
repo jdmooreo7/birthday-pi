@@ -3,6 +3,12 @@
 {% block content %}
 {% if welcome %}<div class="notice">Hi {{ person.name }}! Add your own birthday so Grandma remembers it, or skip this for now.</div>{% endif %}
 <h1>{{ person.name if person else "Add a person" }}</h1>
+{% if face_photos %}
+<a class="card" href="/people/{{ person.id }}/faces" style="text-decoration: none; color: inherit">
+  <span class="name">{{ person.name }}'s faces</span>
+  <span class="muted small">In {{ face_photos }} photo{{ "" if face_photos == 1 else "s" }}. Is this all {{ person.name }}?</span>
+</a>
+{% endif %}
 <form method="post" action="{{ '/people/' ~ person.id if person else '/people/new' }}" novalidate>
   <div class="field{% if errors.name %} has-error{% endif %}">
     <label for="name">Name</label>
@@ -27,9 +33,10 @@
         {% if errors[prefix ~ '_kind'] %}<div class="error">{{ errors[prefix ~ '_kind'] }}</div>{% endif %}
       </div>
       {% include "_date_fields.html" %}
+      {% if values[prefix ~ '_month'] and not loop.last %}<label class="check"><input type="checkbox" name="{{ prefix }}_remove" value="1"{% if values[prefix ~ '_remove'] %} checked{% endif %}> Remove this anniversary</label>{% endif %}
     </div>
     {% endfor %}
-    <p class="muted small">To add another, save first. To remove one, set its month to "–".</p>
+    <p class="muted small">To add another, save first.</p>
   </fieldset>
   <button class="btn" type="submit">Save</button>
 </form>

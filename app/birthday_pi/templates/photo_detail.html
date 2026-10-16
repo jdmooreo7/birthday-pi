@@ -19,6 +19,7 @@
   </form>
   {% endif %}
 {% endif %}
+{% if recognised %}<p class="small"><span class="name">Found by face:</span> {{ recognised | join(", ") }}</p>{% endif %}
 <form method="post" action="/photos/{{ photo.id }}/tags">
   <fieldset>
     <legend>Who's in this photo?</legend>
@@ -32,4 +33,5 @@
   <button class="btn secondary" type="submit">Save who's in it</button>
 </form>
 <a class="btn quiet" href="/photos">All photos</a>
+{% if trusted_owner and photo.status != "pending" %}<a class="btn quiet" href="/photos/{{ photo.id }}/delete">Delete from Birthday Pi</a>{% endif %}
 {% endblock %}

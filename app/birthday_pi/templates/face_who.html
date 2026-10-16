@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Who is this?{% endblock %}
+{% block content %}
+<div class="top">
+  <a href="/faces/{{ group.id }}">Back</a>
+</div>
+<div class="who-head">
+  <span class="face-strip big">{% for f in strip %}<img src="/face-files/{{ f }}.jpg" alt="">{% endfor %}</span>
+  <div><h1>Who is this?</h1><p class="muted">In {{ group.photos }} photos</p></div>
+</div>
+<form method="post" action="/faces/{{ group.id }}/who" class="card">
+  <div class="field">
+    <label for="new_name">Type a name</label>
+    <input id="new_name" name="new_name" maxlength="40" autocomplete="off" required>
+  </div>
+  <button class="btn" type="submit">Add a new person</button>
+  <p class="muted small">If someone already has this name, these photos go to them.</p>
+</form>
+<form method="post" action="/faces/{{ group.id }}/who">
+  <h2>Or pick someone already in Birthday Pi</h2>
+  <div class="list">
+    {% for p in people %}
+    <button class="choice" type="submit" name="person_id" value="{{ p.id }}">
+      <span class="avatar{% if p.is_owner %} owner{% endif %}">{{ p.name[:1] | upper }}</span>
+      <span class="grow"><span class="name">{{ p.name }}</span><span class="muted small">{{ details[p.id] }}</span></span>
+    </button>
+    {% endfor %}
+  </div>
+</form>
+{% endblock %}

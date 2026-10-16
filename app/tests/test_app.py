@@ -66,6 +66,24 @@ def test_add_person_with_birthday_and_typed_anniversaries(set_up):
     client.post(f"/people/{dana}", data={"name": "Dana", "ann_count": "2", "ann_0_kind": "wedding",
                                          "ann_0_month": "11", "ann_0_day": "9", "ann_1_kind": "graduation"})
     assert "Graduation" not in client.get("/people").text
+    # So does ticking "Remove this anniversary".
+    assert 'name="ann_0_remove"' in client.get(f"/people/{dana}").text
+    client.post(f"/people/{dana}", data={"name": "Dana", "ann_count": "2", "ann_0_kind": "wedding", "ann_0_month": "11",
+                                         "ann_0_day": "9", "ann_0_remove": "1", "ann_1_kind": "wedding"})
+    assert "Wedding" not in client.get("/people").text
+
+
+def test_couple_wedding_anniversary_shows_once(tmp_path, monkeypatch):
+    from birthday_pi.dates import upcoming
+    monkeypatch.setenv("BIRTHDAY_PI_DATA", str(tmp_path))
+    conn = db.connect()
+    ids = [conn.execute("INSERT INTO people (name) VALUES (?)", (n,)).lastrowid for n in ("Dana", "Sam", "Rosa")]
+    for pid in ids[:2]:
+        conn.execute("INSERT INTO anniversaries (person_id, kind, month, day, year) VALUES (?, 'wedding', 9, 9, 2013)", (pid,))
+    conn.execute("INSERT INTO anniversaries (person_id, kind, month, day, year) VALUES (?, 'wedding', 9, 9, 1980)", (ids[2],))
+    found = upcoming(conn, date(2026, 9, 9))
+    assert [(c.name, c.extra) for c in found] == [("Dana & Sam", "13 years"), ("Rosa", "46 years")]
+    assert found[0].person_ids == tuple(ids[:2])
 
 
 def test_coming_up_only_shows_next_60_days(set_up, monkeypatch):
@@ -214,3 +232,10 @@ def test_testing_wait_before_photos(set_up):
     client.post("/settings/date", data={"action": "normal"})
     assert client.get("/screen/content").headers["X-Screen-Idle"] == "300"
     assert 'role="status">Testing' not in client.get("/").text  # banner gone
+
+
+def test_database_waits_for_a_busy_sd_card(tmp_path, monkeypatch):
+    monkeypatch.setenv("BIRTHDAY_PI_DATA", str(tmp_path))
+    conn = db.connect()
+    assert conn.execute("PRAGMA busy_timeout").fetchone()[0] == 30000
+    assert conn.execute("PRAGMA synchronous").fetchone()[0] == 1  # NORMAL

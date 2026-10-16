@@ -64,10 +64,60 @@ input:focus, select:focus, .btn:focus-visible, .choice:focus-visible, a:focus-vi
 .btn.dark { background: var(--ink); border-color: var(--ink); color: var(--bg); width: auto; min-height: 48px; padding: 0 24px; }
 .btn.dark:hover { background: #000; border-color: #000; }
 .thumbs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
-.thumbs a { display: block; aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: var(--line); }
+.thumbs a, .thumbs span { display: block; aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: var(--line); }
 .thumbs img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .photo { width: 100%; height: auto; border-radius: 14px; display: block; background: var(--line); }
 .checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .check { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 12px; margin: 0;
   border: 2px solid var(--line); border-radius: 12px; background: var(--card); font-weight: 400; cursor: pointer; }
 .check input { width: 24px; height: 24px; min-height: 0; margin: 0; accent-color: var(--accent); }
+/* Naming faces (M6) */
+.center { text-align: center; }
+.progress { display: flex; flex-direction: column; gap: 6px; }
+.progress-text { display: flex; justify-content: space-between; font-size: 16px; }
+.bar { height: 10px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.bar > div { height: 100%; background: var(--accent); }
+.groups { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.group-row { display: flex; align-items: center; gap: 12px; min-height: 72px; padding: 10px 12px; background: var(--card);
+  border: 2px solid var(--line); border-radius: 16px; text-decoration: none; color: var(--ink); font-weight: 400; }
+.group-row:hover { border-color: var(--accent); color: var(--ink); }
+.group-row .go { color: var(--accent); font-weight: 700; padding: 0 4px; }
+.face-strip { display: flex; flex-shrink: 0; padding-right: 10px; }
+.face-strip img { width: 44px; height: 44px; margin-right: -10px; border-radius: 50%; border: 2px solid var(--card);
+  object-fit: cover; background: var(--line); }
+.face-strip.big img { width: 56px; height: 56px; margin-right: -12px; border-color: var(--bg); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.chip { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px 0 6px; background: var(--card);
+  border: 2px solid var(--line); border-radius: 999px; font-size: 16px; font-weight: 400; color: var(--ink); text-decoration: none; }
+.chip .avatar { width: 32px; height: 32px; }
+.face-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.face-tile { position: relative; display: block; aspect-ratio: 1; margin: 0; border-radius: 14px; overflow: hidden;
+  border: 3px solid transparent; background: var(--line); cursor: pointer; }
+.face-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.face-tile input { position: absolute; opacity: 0; width: 1px; height: 1px; min-height: 0; margin: 0; }
+.face-tile:has(input:focus-visible) { outline: 3px solid var(--accent); outline-offset: 2px; }
+.face-tile:has(input:checked) { border-color: var(--ink); }
+.face-tile:has(input:checked) img { opacity: .5; }
+.face-tile .x { display: none; position: absolute; top: 4px; right: 4px; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--ink); }
+.face-tile .x::before, .face-tile .x::after { content: ""; position: absolute; left: 6px; top: 12px; width: 14px; height: 2.5px;
+  background: #fff; border-radius: 2px; transform: rotate(45deg); }
+.face-tile .x::after { transform: rotate(-45deg); }
+.face-tile:has(input:checked) .x { display: block; }
+.row3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.btn.small-btn { min-height: 48px; font-size: 16px; padding: 0 8px; }
+.who-head { display: flex; align-items: center; gap: 14px; }
+.named-hero { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding-top: 12px; }
+.avatar.huge { width: 88px; height: 88px; font-size: 40px; background: var(--accent); color: #fff; }
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.facts > div { display: flex; flex-direction: column; gap: 2px; }
+/* M7: "Is this Leo?" and "Is this all Leo?" */
+.ask-face { width: 200px; height: 200px; border-radius: 50%; object-fit: cover; border: 4px solid var(--card); background: var(--line);
+  box-shadow: 0 2px 12px rgba(43, 43, 58, .12); }
+.ask-where { display: flex; flex-direction: row; align-items: center; gap: 12px; }
+.ask-photo { position: relative; flex-shrink: 0; width: 96px; line-height: 0; border-radius: 8px; overflow: hidden; }
+.ask-photo img { width: 100%; height: auto; display: block; }
+.ask-photo .ring { position: absolute; border: 3px solid var(--accent); border-radius: 50%; box-sizing: border-box; }
+.new-badge { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--accent); color: #fff;
+  font-size: 13px; font-weight: 700; line-height: 1.5; }
+.new-badge.on-tile { position: absolute; left: 4px; bottom: 4px; font-size: 11px; padding: 0 6px; }

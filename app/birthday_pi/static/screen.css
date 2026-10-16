@@ -48,7 +48,7 @@ body.idle-cursor { cursor: none; }
   border-radius: 3vh; display: flex; align-items: center; justify-content: space-between; gap: 2.5vw; }
 .rtext { display: flex; flex-direction: column; gap: 0.8vh; min-width: 0; }
 .rlabel { font-size: 3.2vh; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
-.rhead { font-weight: 700; line-height: 1.05; }
+.rhead { font-weight: 700; line-height: 1.05; font-size: calc(var(--px) / 10.8 * 1vh); }  /* --px: size on the 1080p mockup */
 .rsub { font-size: 3.4vh; }
 .rcard form { margin: 0; flex-shrink: 0; }
 .rcard button { font: inherit; font-size: 4.4vh; font-weight: 700; min-width: 15vw; min-height: 10.4vh; padding: 1.8vh 3vw;
@@ -101,3 +101,71 @@ body.photos #photos { opacity: 1; }
   justify-content: space-between; color: var(--fg); background: linear-gradient(transparent, rgba(0,0,0,.65)); }
 #photo-title { font-size: 8.9vh; font-weight: 700; line-height: 1.05; }
 #photo-clock { font-size: 6.7vh; font-variant-numeric: tabular-nums; }
+/* A phone or tablet held upright: one column, sized by width, and the page scrolls. The monitor never matches this. */
+@media (orientation: portrait) {
+  html, body { height: auto; min-height: 100%; overflow-x: hidden; overflow-y: auto; }
+  #content { height: auto; }
+  .welcome, .home, .reminders, .pinpage, .approve { height: auto; min-height: 100vh; min-height: 100dvh; }
+  .welcome { padding: 8vw 6vw; gap: 10vw; justify-content: flex-start; }
+  .brand { gap: 2.5vw; font-size: 6vw; }
+  .brand svg { width: 7vw; height: 7vw; }
+  .welcome h1 { margin-bottom: 6vw; font-size: 11vw; }
+  .join { flex-direction: column; align-items: flex-start; gap: 6vw; }
+  .qr { width: 55vw; height: 55vw; border-radius: 3vw; }
+  .join-text { gap: 2.5vw; }
+  .join-text .big { font-size: 6.5vw; }
+  .join-text .mid { font-size: 4.5vw; }
+  .join-text .url { font-size: 5.5vw; overflow-wrap: anywhere; }
+  .footnote { font-size: 4vw; }
+  .home { padding: 6vw 5vw; gap: 7vw; }
+  .home-main { grid-template-columns: minmax(0, 1fr); gap: 8vw; }
+  .clock-col { gap: 1vw; }
+  #clock { font-size: 24vw; }
+  #date { font-size: 6vw; }
+  .coming { gap: 3vw; }
+  .coming h2 { font-size: 6.5vw; }
+  .event { gap: 3.5vw; padding: 3.5vw 4vw; border-radius: 3vw; }
+  .event .avatar { width: 11vw; height: 11vw; font-size: 5vw; }
+  .event .who { font-size: 5.5vw; }
+  .event .what, .event .away { font-size: 4vw; }
+  .event .when { flex-shrink: 0; white-space: nowrap; }
+  .event .day { font-size: 5vw; }
+  .empty { font-size: 5vw; }
+  .status { flex-direction: column; align-items: flex-start; gap: 3vw; padding: 4vw; border-radius: 3vw; font-size: 4.2vw; min-height: 0; }
+  .status a.look, .next a.look { display: inline-block; font-size: 4.4vw; padding: 2.5vw 4.5vw; }
+  .reminders { padding: 5vw; gap: 4vw; }
+  .small-date { font-size: 4.5vw; }
+  .reminders #clock { font-size: 6vw; }
+  .rcard, .rcard.single { flex: none; display: flex; flex-direction: column; align-items: stretch; gap: 5vw; padding: 5vw; border-radius: 4vw; }
+  .rcard.single { min-height: 65vh; justify-content: space-between; }
+  .rcard.single .rtext { display: flex; flex: 1 1 auto; justify-content: space-between; }
+  .rcard.single .rlabel, .rcard.single .rhead, .rcard.single .rsub { align-self: auto; }
+  .rtext { gap: 2vw; }
+  .rlabel, .rcard.single .rlabel { font-size: 3.8vw; }
+  .rhead { font-size: calc(var(--px) * 0.09vw); overflow-wrap: anywhere; }  /* 64 to 160 on the monitor becomes 5.8 to 14.4vw */
+  .rsub, .rcard.single .rsub { font-size: 4.6vw; }
+  .rcard button { width: 100%; min-width: 0; min-height: 13vw; font-size: 5vw; padding: 3vw 6vw; }
+  .more, .next { font-size: 4.2vw; }
+  .pinpage { flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 8vw; padding: 8vw 6vw; }
+  .pintext { max-width: none; gap: 3vw; }
+  .pintext h1 { font-size: 9vw; }
+  .mid { font-size: 4.5vw; }
+  .dots { gap: 4vw; margin-top: 2vw; }
+  .dots span { width: 6vw; height: 6vw; border-width: 0.8vw; }
+  .pinerror { font-size: 4.5vw; }
+  .pinpad { gap: 4vw; }
+  .keys { gap: 3vw; }
+  .keys button { width: auto; height: 17vw; font-size: 8vw; border-radius: 3vw; }
+  .notnow, button.ghost { font-size: 4.6vw; min-height: 13vw; border-width: 0.6vw; padding: 0 5vw; }
+  .approve { padding: 5vw; gap: 5vw; }
+  .approve-top { flex-direction: column; align-items: stretch; gap: 3vw; }
+  .approve-top h1 { font-size: 8vw; }
+  .approve-grid { flex: none; overflow: visible; grid-template-columns: minmax(0, 1fr); gap: 5vw; }
+  .approve-card { gap: 3vw; padding: 3vw; border-radius: 4vw; }
+  .approve-card img { height: 60vw; border-radius: 2.5vw; }
+  .approve-buttons { gap: 3vw; }
+  button.yes { font-size: 4.8vw; min-height: 13vw; }
+  #photo-bar { flex-direction: column; align-items: flex-start; gap: 2vw; padding: 5vw; }
+  #photo-title { font-size: 8vw; }
+  #photo-clock { font-size: 6vw; }
+}
