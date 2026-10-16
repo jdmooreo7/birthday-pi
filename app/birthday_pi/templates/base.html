@@ -13,7 +13,8 @@
 <body>
 <main>
   <div class="top">
-    <a class="brand" href="/">{{ product }}</a>
+    {% if request.url.path == "/" %}<a class="brand" href="/">{{ product }}</a>
+    {% else %}<a class="home-btn" href="/"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg>Home</a>{% endif %}
     {% if device %}<div class="who">{{ device.name }} · <a href="/who">Not you?</a></div>{% endif %}
   </div>
   {% if pretend or test_idle %}<div class="pretend" role="status">Testing:{% if pretend %} pretending today is {{ pretend.strftime("%A, %B") }} {{ pretend.day }}{% endif %}{% if pretend and test_idle %} ·{% endif %}{% if test_idle %} photos after {{ test_idle }}{% endif %}</div>{% endif %}

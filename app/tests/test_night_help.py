@@ -55,3 +55,11 @@ def test_phone_pages_give_the_home_screen_an_icon_and_name(set_up):
     assert 'rel="apple-touch-icon" href="/static/icon-180.png' in page
     assert '<meta name="apple-mobile-web-app-title" content="Birthday Pi">' in page
     assert set_up.get("/static/icon-180.png").headers["content-type"] == "image/png"
+
+
+def test_a_home_button_on_every_page_but_home(set_up):
+    home = set_up.get("/").text
+    assert 'class="brand"' in home and 'class="home-btn"' not in home
+    for path in ("/people", "/photos", "/help", "/settings/night"):
+        page = set_up.get(path).text
+        assert 'class="home-btn" href="/"' in page and 'class="brand"' not in page, path
