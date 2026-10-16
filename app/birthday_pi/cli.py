@@ -9,6 +9,7 @@ from . import db, devices, pins
 USAGE = """\
   reset-pin            Choose a new PIN for Grandma (asks twice). Her phones must enter it again.
   load-sample [--pin]  Set up a fresh Pi with a sample family for testing (PIN 1234 unless given).
+  pilot-stats [--days] Numbers for the weekly pilot check: reminders, photos, faces. No names or dates.
 """
 
 
@@ -77,6 +78,66 @@ def load_sample(args) -> int:
     return 0
 
 
+def pilot_stats(conn, today: date, days: int = 7) -> list[str]:
+    """How the last `days` went, as numbers only, so the notes we take away hold nothing about the family."""
+    import statistics
+    from datetime import datetime, timezone
+
+    from . import naming, reminders
+
+    first_day = {name: start for name, start, *_ in reminders.STAGES}
+    since = today - timedelta(days=days)
+    lines = []
+    pretend = db.get_setting(conn, "pretend_date")
+    if pretend:
+        lines.append("Note: a pretend date is on, so these numbers are for testing.")
+
+    # "Got it": how long after a reminder first appeared (midnight of its first day) it was cleared.
+    hours, same_day, early = [], 0, 0
+    for key, acked_at in conn.execute("SELECT key, acked_at FROM reminder_acks"):
+        _, stage, when = key.split(":")
+        shown = date.fromisoformat(when) - timedelta(days=first_day[stage])
+        acked = datetime.fromisoformat(acked_at).replace(tzinfo=timezone.utc).astimezone()
+        if acked.date() <= since:
+            continue
+        h = (acked.replace(tzinfo=None) - datetime.combine(shown, datetime.min.time())).total_seconds() / 3600
+        if h < 0:  # cleared before it was due: someone was testing with a pretend date
+            early += 1
+            continue
+        hours.append(h)
+        same_day += acked.date() == shown
+    waiting = {r.key for r in reminders.active(conn, today)}
+    missed = set()
+    for i in range(1, days + 1):
+        missed |= {r.key for r in reminders.active(conn, today - timedelta(days=i))} - waiting
+    lines.append(f"Reminders cleared with Got it: {len(hours)} ({same_day} on the day they appeared)")
+    if hours:
+        lines.append(f"  hours from appearing to Got it: median {statistics.median(hours):.1f}, longest {max(hours):.1f}")
+    if early:
+        lines.append(f"  not counted: {early} cleared while testing with a pretend date")
+    lines.append(f"Reminders showing now: {len(waiting)}")
+    lines.append(f"Reminders that ended without Got it: {len(missed)}")
+
+    # Photos and faces: is Grandma keeping up on her own?
+    pending = conn.execute("SELECT COUNT(*), MIN(created_at) FROM photos WHERE status = 'pending'").fetchone()
+    oldest = ""
+    if pending[0]:
+        age = today - datetime.fromisoformat(pending[1]).replace(tzinfo=timezone.utc).astimezone().date()
+        oldest = f" (oldest waiting {age.days} days)"
+    added = conn.execute("SELECT COUNT(*) FROM photos WHERE created_at > ?", (since.isoformat(),)).fetchone()[0]
+    lines.append(f"Photos added: {added}; waiting for Grandma's OK: {pending[0]}{oldest}")
+    lines.append(f"Faces waiting for \"Is this ...?\": {len(naming.asking(conn))}")
+    lines.append(f"People in Birthday Pi: {conn.execute('SELECT COUNT(*) FROM people').fetchone()[0]}")
+    return lines
+
+
+def show_pilot_stats(args) -> int:
+    conn = db.connect()
+    from .main import today
+    print("\n".join(pilot_stats(conn, today(conn), args.days)))
+    return 0
+
+
 def _sample_photos(conn, ids: dict[str, int]) -> int:
     """Simple drawn "photos" with names on them, tagged, so the slideshow has something to show."""
     import io
@@ -111,6 +172,9 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("load-sample", help="set up a fresh Pi with a sample family")
     p.add_argument("--pin", help="Grandma's PIN for the sample (default 1234)")
     p.set_defaults(func=load_sample)
+    p = sub.add_parser("pilot-stats", help="numbers for the weekly pilot check")
+    p.add_argument("--days", type=int, default=7, help="how many days back (default 7)")
+    p.set_defaults(func=show_pilot_stats)
     args = parser.parse_args(argv)
     return args.func(args)
 

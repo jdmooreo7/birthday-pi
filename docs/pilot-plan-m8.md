@@ -1,8 +1,22 @@
 # Birthday Pi: M8 pilot plan (v0.3 "Grandma pilot")
 
-**Status:** Draft for Product Owner review · **Written:** 2026-10-15 · **Release:** v0.3 (M8 pilot, M9 fixes and a 7-day soak)
+**Status:** Planning (M8 started 2026-10-15) · **Written:** 2026-10-15 · **Release:** v0.3 (M8 pilot, M9 fixes and a 7-day soak)
 
 M8 is the first time someone who isn't us uses Birthday Pi every day. A second Pi runs at a real Grandma's home, with her family. We watch the first session in person, then learn from a weekly check-in and from what the Pi records about itself. Decisions are logged in `product-decisions.md`.
+
+## Prep checklist (before day one)
+| # | Step | Who | Done when |
+|---|---|---|---|
+| 1 | Pick the 3-week window with a real birthday or anniversary in it | PO | Dates agreed with her family |
+| 2 | Ask what phone she uses, and how old it is | PO | Model and system version known. Anything older than iOS 14.5 or Chrome 87 gets our "too old" message, and older Android phones may not open `birthdaypi.local` (then we use the Pi's address instead) |
+| 3 | Consent from the adults in her family, and parents for children | PO, with a one-page note from Security | Everyone has said OK before photos go in |
+| 4 | Buy the hardware (list under "The second Pi") | PO | Arrived |
+| 5 | Tag `v0.2.1` after a few days of our Pi running it cleanly | Tech Lead, SRE | Tag on `main` |
+| 6 | Install it at our house **using only the README**, timed, noting every snag | PO (Tech Lead watches) | Install report filed; README fixed |
+| 7 | 48-hour burn-in at our house with the sample family, then wipe it | SRE | 0 restarts; data wiped so she starts fresh |
+| 8 | Printed card by the screen, and the day-one script | Designer | Approved on the design canvas |
+| 9 | Pilot helpers: a numbers-only weekly check (`scripts/pilot-stats.sh`) and a safe data copy to the USB stick (`scripts/backup-data.sh`) | Tech Lead, SRE | Built and tested on our Pi 2026-10-15: the check matched the live counts, and a copy restored into a throwaway volume passed SQLite's integrity check with all 12 people, 228 photos and 223 faces |
+| 10 | Day one next door (see below) | Everyone | She's using it |
 
 ## Goal and pass (Product Manager)
 **What we want to learn:** does Grandma notice and act on reminders without being prompted, can she look after photos and faces herself, and does the Pi keep running without us?
@@ -29,10 +43,10 @@ M8 is the first time someone who isn't us uses Birthday Pi every day. A second P
 - **If the screen is her smart TV,** the Pi 5 can take the TV remote's arrow and OK buttons over HDMI (HDMI-CEC; our Pi has `/dev/cec0`). Then OK could mean "Got it". But a TV is off or showing something else most of the day, so she'd miss reminders unless the Pi turns the TV on, and that is intrusive. The pilot uses a dedicated, always-on monitor (PO), and the TV remote is a v1.1 "Beyond the monitor" idea.
 
 ## The second Pi (Tech Lead)
-- **Hardware:** Pi 5 (4 GB), its official power supply, a new 32 GB SD card, a case with a fan, and a dedicated monitor for her home, as on our Pi (see question 2).
-- **Software:** the `v0.2.0` tag, installed **using only the README** on a freshly flashed card. That doubles as an early run of M12 (an outside install) and shows us what the README is missing. The kiosk is on.
+- **Hardware:** Pi 5 (4 GB), the official 27 W power supply, a 64 GB high-endurance microSD (Samsung PRO Endurance, or SanDisk High Endurance), the official case with its fan, a micro-HDMI to HDMI cable, a USB stick for the data copies, and a dedicated monitor for her home, as on our Pi.
+- **Software:** a `v0.2.1` tag (proposed): v0.2.0 plus what we deployed after the soak (evidence through a reboot, `update.sh`, the old-browser message), once it has run cleanly on our Pi for a few days. Installed **using only the README** on a freshly flashed card. That doubles as an early run of M12 (an outside install) and shows us what the README is missing. The kiosk is on.
 - **Memory:** the same as our Pi: app about 65 MB, faces worker up to 768 MB while it's scanning, Chromium about 1.1 GB, and about 2.5 GB left free. The dashboards (on) add 250–350 MB of memory, 1.6 GB of disk and up to 256 MB of metrics history.
-- **What we build for M8:** nothing new, by design. We pilot what passed M7. Anything we learn goes into M9.
+- **What we build for M8:** no new features, by design. We pilot what passed M7; anything we learn goes into M9. Only small helpers for running the pilot (see the prep checklist).
 
 ## Keeping it running (SRE)
 - **Before we leave on day one:** pull the power to check it comes back to the screen by itself, and check the self-healing health checks are working.
@@ -88,12 +102,14 @@ Read on our Pi with values hidden; only the shape of each line was looked at.
 - The pilot Grandma is someone other than the PO's own family, who lives next door; when is still to be chosen.
 - A dedicated, always-on monitor, as on our Pi.
 - Option B to keep evidence through a reboot; C (an update run by the PO) if needed; no remote access.
+- The pilot runs a `v0.2.1` tag; the two pilot helpers and the README step for keeping the log through a restart are built.
 - Her phone is how she does things; the screen needs no input.
 - Dashboards are on for the pilot.
 
 ## Questions for the Product Owner
 1. **When:** a 3-week window with a real birthday in it.
 2. **Hardware:** do we buy a second Pi kit and monitor, or use ones she already has?
+3. **Her phone:** which phone and how old (prep step 2)?
 
 ## M9 (after the pilot)
 Fix the ranked list from M8, deploy to both Pis, then run a 7-day soak on her Pi. Tag `v0.3.0`.
