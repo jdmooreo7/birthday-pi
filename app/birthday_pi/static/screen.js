@@ -5,7 +5,18 @@
   const params = new URLSearchParams(location.search);
   // Wait before photos and night dim: ?idle= for a quick test, else the Pi's setting (5 minutes unless testing).
   let IDLE_MS = (Number(params.get("idle")) || Number(document.body.dataset.idle) || 5 * 60) * 1000;
-  const [NIGHT_START, NIGHT_END] = (params.get("night") || "22-5").split("-").map(Number);
+  // Night hours and how dark: Grandma's choice from the Pi ("22-5-0.85" or "off"), unless ?night= is given.
+  let [NIGHT_START, NIGHT_END] = (params.get("night") || "22-5").split("-").map(Number);
+  let NIGHT_ON = true;
+  function setNight(value) {
+    if (params.get("night") || !value) return;
+    NIGHT_ON = value !== "off";
+    if (!NIGHT_ON) return;
+    const [start, end, dim] = value.split("-");
+    NIGHT_START = Number(start); NIGHT_END = Number(end);
+    document.body.style.setProperty("--night-dim", dim);
+  }
+  setNight(document.body.dataset.night);
   const CURSOR_MS = 5000;
   const REFRESH_MS = 10 * 1000;
   const PHOTO_MS = (Number(params.get("photo")) || 60) * 1000;  // each photo stays up 1 minute
@@ -27,7 +38,7 @@
     const clock = document.getElementById("clock");
     if (clock) clock.textContent = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     document.body.classList.toggle("idle-cursor", idle >= CURSOR_MS);
-    document.body.classList.toggle("night", idle >= IDLE_MS && isNight(now));
+    document.body.classList.toggle("night", NIGHT_ON && idle >= IDLE_MS && isNight(now));
     const photoClock = document.getElementById("photo-clock");
     if (photoClock) photoClock.textContent = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     const cl = document.body.classList;
@@ -73,6 +84,7 @@
       if (build && build !== document.body.dataset.build) { location.reload(); return; }  // app was updated
       const idle = Number(res.headers.get("X-Screen-Idle"));
       if (idle && !params.get("idle")) IDLE_MS = idle * 1000;
+      setNight(res.headers.get("X-Screen-Night"));
       const html = await res.text();
       const content = document.getElementById("content");
       if (content.dataset.html !== html) {

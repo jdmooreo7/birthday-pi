@@ -121,3 +121,37 @@ input:focus, select:focus, .btn:focus-visible, .choice:focus-visible, a:focus-vi
 .new-badge { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--accent); color: #fff;
   font-size: 13px; font-weight: 700; line-height: 1.5; }
 .new-badge.on-tile { position: absolute; left: 4px; bottom: 4px; font-size: 11px; padding: 0 6px; }
+
+/* Help page, footer and "Screen at night" (M8). */
+[hidden] { display: none !important; }
+.foot { text-align: center; padding-top: 8px; }
+.foot a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; }
+.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; counter-reset: step; }
+.steps li { position: relative; padding-left: 64px; display: flex; flex-direction: column; gap: 6px; line-height: 1.45; }
+.steps li::before { counter-increment: step; content: counter(step); position: absolute; left: 14px; top: 14px; width: 36px;
+  height: 36px; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 700; display: flex;
+  align-items: center; justify-content: center; }
+.steps h2 { font-size: 20px; }
+.card.warm { display: flex; flex-direction: column; gap: 10px; }
+.btn.dark.call { width: 100%; min-height: 56px; }
+.seg, .levels { position: relative; }
+.seg input, .levels input { position: absolute; opacity: 0; width: 1px; height: 1px; min-height: 0; }
+.seg label, .levels label { margin: 0; display: flex; align-items: center; justify-content: center; min-height: 52px;
+  border: 2px solid var(--line); border-radius: 999px; background: var(--card); font-size: 18px; cursor: pointer; }
+.seg input:checked + label { background: var(--ink); border-color: var(--ink); color: #fff; }
+.seg input:focus-visible + label, .levels input:focus-visible + label { outline: 3px solid var(--accent); outline-offset: 2px; }
+.sub { font-size: 18px; margin-top: 8px; }
+.stepper { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px; border-radius: 14px;
+  background: var(--card); border: 2px solid var(--line); }
+.stepper output { font-size: 24px; font-weight: 700; }
+.stepper .row2 { width: 100%; gap: 6px; }
+.stepper button { font: inherit; font-size: 22px; font-weight: 700; min-height: 44px; border-radius: 12px;
+  border: 2px solid var(--line); background: var(--bg); color: var(--ink); }
+.levels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.levels label { flex-direction: column; gap: 6px; padding: 8px 4px 10px; border-radius: 14px; border-width: 3px;
+  font-size: 15px; text-align: center; line-height: 1.2; }
+.levels input:checked + label { border-color: var(--accent); }
+.mini { position: relative; display: block; width: 84px; height: 50px; border-radius: 6px; background: #1e1b2e;
+  color: #fbf6ee; font-size: 17px; line-height: 50px; overflow: hidden; font-weight: 400; }
+.mini span { position: absolute; inset: 0; background: #000; }
+fieldset:disabled label, fieldset:disabled button { cursor: default; opacity: 0.7; }
