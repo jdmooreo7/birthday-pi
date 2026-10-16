@@ -139,9 +139,21 @@ sudo reboot
 
 If the Pi doesn't boot, put the SD card in another computer and rename `cmdline.txt.bak` back to `cmdline.txt`.
 
+## Optional: keep the Pi's own log through a restart
+
+Raspberry Pi OS keeps the system log in memory, so a restart loses the clues to why the screen went blank or the Pi froze. To keep it on the SD card instead (at most 200 MB), from `~/birthday-pi`:
+
+```sh
+sudo mkdir -p /etc/systemd/journald.conf.d
+sudo cp scripts/journald-birthday-pi.conf /etc/systemd/journald.conf.d/50-birthday-pi.conf
+sudo systemctl restart systemd-journald
+```
+
+To undo: `sudo rm /etc/systemd/journald.conf.d/50-birthday-pi.conf`, then `sudo systemctl restart systemd-journald`.
+
 ## Optional: watch it live (for whoever looks after the Pi)
 
-Two dashboards show what the Pi is doing right now: **Netdata** (memory, CPU, temperature and each container, second by second, with alerts) on port 19999, and **Dozzle** (live logs from each container) on port 9080. They're off unless you turn them on, use about 250–350 MB of memory, keep only the last hour of metrics in memory, and can't reach the internet. They also take about **1.6 GB of disk** for their images (Netdata alone is 1.3 GB), on top of about 0.8 GB for Birthday Pi itself, so leave room on the SD card.
+Two dashboards show what the Pi is doing right now: **Netdata** (memory, CPU, temperature and each container, second by second, with alerts) on port 19999, and **Dozzle** (live logs from each container) on port 9080. They're off unless you turn them on, use about 250–350 MB of memory, keep 7 days of metrics on disk (at most 256 MB), and can't reach the internet. They also take about **1.6 GB of disk** for their images (Netdata alone is 1.3 GB), on top of about 0.8 GB for Birthday Pi itself, so leave room on the SD card.
 
 Both ask for a password. Make one once, from `~/birthday-pi`:
 
@@ -173,6 +185,7 @@ Run these from `~/birthday-pi`:
 | Stop it | `docker compose down` |
 | Start it again | `docker compose up -d` |
 | Update to the latest version | `scripts/update.sh` (goes back to the previous version by itself if anything isn't healthy afterwards) |
+| Copy the family's data to a USB stick | `scripts/backup-data.sh /media/$USER/<stick name>` (keeps the newest 4; the stick holds photos and faces, so keep it safe) |
 | Save what's going on before a reboot, for whoever helps you | `scripts/diag.sh` (logs and numbers only, kept on the Pi in `~/birthday-pi-diag`) |
 | Grandma forgot her PIN | `docker compose exec app python -m birthday_pi.cli reset-pin` (her phones will ask for the new PIN) |
 

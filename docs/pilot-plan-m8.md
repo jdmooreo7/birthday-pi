@@ -15,7 +15,7 @@ M8 is the first time someone who isn't us uses Birthday Pi every day. A second P
 | 6 | Install it at our house **using only the README**, timed, noting every snag | PO (Tech Lead watches) | Install report filed; README fixed |
 | 7 | 48-hour burn-in at our house with the sample family, then wipe it | SRE | 0 restarts; data wiped so she starts fresh |
 | 8 | Printed card by the screen, and the day-one script | Designer | Approved on the design canvas |
-| 9 | Pilot helpers: a numbers-only weekly check (`scripts/pilot-stats.sh`) and a safe data copy to the USB stick (`scripts/backup-data.sh`) | Tech Lead, SRE | Tested on our Pi |
+| 9 | Pilot helpers: a numbers-only weekly check (`scripts/pilot-stats.sh`) and a safe data copy to the USB stick (`scripts/backup-data.sh`) | Tech Lead, SRE | Built and tested on our Pi 2026-10-15: the check matched the live counts, and a copy restored into a throwaway volume passed SQLite's integrity check with all 12 people, 228 photos and 223 faces |
 | 10 | Day one next door (see below) | Everyone | She's using it |
 
 ## Goal and pass (Product Manager)
@@ -102,6 +102,7 @@ Read on our Pi with values hidden; only the shape of each line was looked at.
 - The pilot Grandma is someone other than the PO's own family, who lives next door; when is still to be chosen.
 - A dedicated, always-on monitor, as on our Pi.
 - Option B to keep evidence through a reboot; C (an update run by the PO) if needed; no remote access.
+- The pilot runs a `v0.2.1` tag; the two pilot helpers and the README step for keeping the log through a restart are built.
 - Her phone is how she does things; the screen needs no input.
 - Dashboards are on for the pilot.
 
@@ -109,8 +110,6 @@ Read on our Pi with values hidden; only the shape of each line was looked at.
 1. **When:** a 3-week window with a real birthday in it.
 2. **Hardware:** do we buy a second Pi kit and monitor, or use ones she already has?
 3. **Her phone:** which phone and how old (prep step 2)?
-4. **v0.2.1:** pilot on a `v0.2.1` tag rather than `v0.2.0` (prep step 5)?
-5. **Helpers:** build `pilot-stats.sh`, `backup-data.sh`, and a README step for keeping logs through a reboot (prep step 9)?
 
 ## M9 (after the pilot)
 Fix the ranked list from M8, deploy to both Pis, then run a 7-day soak on her Pi. Tag `v0.3.0`.
