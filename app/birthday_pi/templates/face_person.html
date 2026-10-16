@@ -8,7 +8,7 @@
   <h1>Is this all {{ person.name }}?</h1>
   <p class="muted">{{ person.name }} is in {{ photos }} photo{{ "" if photos == 1 else "s" }}. Tap any face that isn't {{ person.name }}.</p>
 </div>
-{% if faces | rejectattr("confirmed") | list %}<p class="muted small"><span class="new-badge">New</span> Named by Birthday Pi since you last looked</p>{% endif %}
+{% if faces | rejectattr("confirmed") | list %}<p class="muted small"><span class="new-badge">New</span> Named by {{ product }} since you last looked</p>{% endif %}
 <form method="post" action="/people/{{ person.id }}/faces">
   <div class="face-grid">
     {% for f in faces %}

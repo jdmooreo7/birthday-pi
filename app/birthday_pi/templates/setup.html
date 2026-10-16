@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% block title %}Set up Birthday Pi{% endblock %}
+{% block title %}Set up {{ product }}{% endblock %}
 {% block content %}
-<h1>Welcome to Birthday Pi</h1>
-<p>Birthday Pi reminds Grandma of the family's birthdays and anniversaries, and shows family photos on her screen.</p>
+<h1>Welcome to {{ product }}</h1>
+<p>{{ product }} reminds Grandma of the family's birthdays and anniversaries, and shows family photos on her screen.</p>
 <form method="post" action="/setup" novalidate>
   <div class="field{% if errors.owner_name %} has-error{% endif %}">
     <label for="owner_name">What does the family call her?</label>

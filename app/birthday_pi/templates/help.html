@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Help{% endblock %}
+{% block content %}
+<div>
+  <h1>Help</h1>
+  <p class="muted">You do everything on your phone. The screen is just for looking at.</p>
+</div>
+<ol class="steps">
+  <li class="card"><h2>A reminder is on the screen</h2>
+    <p>Buy the gift, send the card, or make the call. Then tap <b>Got it</b> on your home page. The screen clears by itself.</p></li>
+  <li class="card"><h2>Family sent photos</h2>
+    <p>Your home page says <b>"2 photos need your OK"</b>. Tap <b>Review</b>, then <b>Yes, show it</b> or <b>No</b>. Only photos you say yes to go on the screen.</p></li>
+  <li class="card"><h2>It asks "Is this …?" about a face</h2>
+    <p>Sometimes {{ product }} isn't sure who is in a new photo. Tap <b>Yes</b>, <b>No</b>, or <b>Not sure, skip</b>. Any answer is fine, and you can't break anything.</p></li>
+  <li class="card"><h2>The screen is dim at night</h2>
+    {% if night.on %}<p>Your screen goes dark on purpose from {{ hour_label(night.start) }} until {{ hour_label(night.end) }}. A new reminder brightens it straight away.</p>
+    {% else %}<p>Night dimming is off, so your screen stays bright all night.</p>{% endif %}
+    <a href="/settings/night">Change night hours</a></li>
+  <li class="card"><h2>The screen is blank or stuck</h2>
+    <p>Unplug the power from the <b>small {{ product }} box</b> (not the screen). Count to 10, plug it back in, and give it 2 minutes.</p></li>
+</ol>
+<div class="card warm">
+  {% if helper %}
+  <h2>Still stuck?</h2>
+  <a class="btn dark call" href="tel:{{ helper.tel }}">Call {{ helper.name }}</a>
+  <span class="small">{{ helper.phone }}</span>
+  {% elif trusted_owner %}
+  <h2>Still stuck?</h2>
+  {% endif %}
+  {% if trusted_owner %}<a class="small" href="/settings/helper">{% if helper %}Change who to call{% else %}Add who to call{% endif %}</a>{% endif %}
+  <span class="small">Your photos and family details stay in this house. They never go on the internet.</span>
+</div>
+<a class="btn quiet" href="/">Back</a>
+{% endblock %}

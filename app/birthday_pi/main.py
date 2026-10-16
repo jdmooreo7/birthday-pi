@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 
-from . import db, devices, naming, photos, pins, reminders
+from . import PRODUCT, db, devices, naming, photos, pins, reminders
 from .dates import ANNIVERSARY_TYPES, MONTHS, how_far, missing_birthdays, short_date, upcoming, valid_month_day
 
 HERE = Path(__file__).parent
@@ -38,7 +38,8 @@ def static_url(name: str) -> str:
     return f"/static/{name}?v={digest}"
 
 
-templates.env.globals.update(MONTHS=MONTHS, how_far=how_far, short_date=short_date, static_url=static_url)
+templates.env.globals.update(MONTHS=MONTHS, how_far=how_far, short_date=short_date, static_url=static_url,
+                             product=PRODUCT)
 
 
 class RedirectTo(Exception):
@@ -242,6 +243,97 @@ def idle_seconds(conn: sqlite3.Connection) -> int:
 def _testing_page(request, conn, device, status_code=200, error=None):
     return page(request, "pretend_date.html", status_code, device=device, real=date.today(), current=today(conn),
                 error=error, idle=idle_seconds(conn), IDLE_CHOICES=IDLE_CHOICES)
+
+
+# ---------- Screen at night (Grandma's choice) and Help ----------
+
+# How dark the monitor goes at night: (what Grandma sees, opacity of the black layer, a line about it)
+NIGHT_LEVELS = {
+    "little": ("A little", 0.5, "You can still see the clock clearly."),
+    "mostly": ("Mostly", 0.85, "The clock is faint."),
+    "full": ("Fully dark", 1.0, "A black screen. The monitor's own light stays on."),
+}
+
+
+def hour_label(h: int) -> str:
+    return f"{h % 12 or 12} {'am' if h < 12 else 'pm'}"
+
+
+templates.env.globals["hour_label"] = hour_label
+
+
+def night(conn: sqlite3.Connection) -> dict:
+    """Grandma's night settings: dim or not, from and until which hour, and how dark. Default 10 pm to 5 am."""
+    def hour(key, default):
+        value = db.get_setting(conn, key, str(default))
+        return int(value) if value.isdigit() and int(value) < 24 else default
+    level = db.get_setting(conn, "night_level", "mostly")
+    return {"on": db.get_setting(conn, "night_on", "1") == "1", "start": hour("night_from", 22),
+            "end": hour("night_until", 5), "level": level if level in NIGHT_LEVELS else "mostly"}
+
+
+def night_for_screen(conn: sqlite3.Connection) -> str:
+    n = night(conn)
+    return f"{n['start']}-{n['end']}-{NIGHT_LEVELS[n['level']][1]}" if n["on"] else "off"
+
+
+@app.get("/settings/night")
+def night_form(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    device = require_device(conn, request)
+    return page(request, "night.html", device=device, night=night(conn), LEVELS=NIGHT_LEVELS,
+                trusted_owner=devices.is_trusted_owner(device), owner=db.owner(conn),
+                saved=request.query_params.get("saved") == "1")
+
+
+@app.post("/settings/night")
+async def night_save(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    require_trusted_owner(conn, request)
+    form = await request.form()
+    current = night(conn)
+    try:
+        start, end = int(str(form.get("start"))), int(str(form.get("end")))
+    except ValueError:
+        start, end = current["start"], current["end"]
+    level = str(form.get("level", current["level"]))
+    db.set_setting(conn, "night_on", "0" if form.get("on") == "0" else "1")
+    if 0 <= start < 24 and 0 <= end < 24 and start != end:
+        db.set_setting(conn, "night_from", str(start))
+        db.set_setting(conn, "night_until", str(end))
+    if level in NIGHT_LEVELS:
+        db.set_setting(conn, "night_level", level)
+    return RedirectResponse("/settings/night?saved=1", status_code=303)
+
+
+def helper(conn: sqlite3.Connection) -> dict | None:
+    """Who Grandma calls when she's stuck, if the family has filled it in."""
+    name, phone = db.get_setting(conn, "helper_name", ""), db.get_setting(conn, "helper_phone", "")
+    return {"name": name, "phone": phone, "tel": re.sub(r"[^0-9+]", "", phone)} if name and phone else None
+
+
+@app.get("/help")
+def help_page(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    device = devices.current(conn, request)
+    return page(request, "help.html", device=device, night=night(conn), helper=helper(conn),
+                trusted_owner=devices.is_trusted_owner(device))
+
+
+@app.get("/settings/helper")
+def helper_form(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    device = require_trusted_owner(conn, request)
+    return page(request, "helper.html", device=device, helper=helper(conn) or {"name": "", "phone": ""})
+
+
+@app.post("/settings/helper")
+async def helper_save(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    require_trusted_owner(conn, request)
+    form = await request.form()
+    name, phone = str(form.get("name", "")).strip()[:60], str(form.get("phone", "")).strip()[:30]
+    if name and re.search(r"[0-9]", phone):
+        db.set_setting(conn, "helper_name", name)
+        db.set_setting(conn, "helper_phone", phone)
+    else:
+        conn.execute("DELETE FROM settings WHERE key IN ('helper_name', 'helper_phone')")
+    return RedirectResponse("/help", status_code=303)
 
 
 @app.get("/settings/date")
@@ -906,7 +998,8 @@ def _screen_build() -> str:
 
 @app.get("/screen")
 def screen(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
-    return page(request, "screen.html", build=_screen_build(), idle=idle_seconds(conn), **_screen_context(conn))
+    return page(request, "screen.html", build=_screen_build(), idle=idle_seconds(conn), night=night_for_screen(conn),
+                **_screen_context(conn))
 
 
 @app.get("/screen/content")
@@ -914,4 +1007,5 @@ def screen_content(request: Request, conn: sqlite3.Connection = Depends(get_conn
     response = page(request, "_screen_content.html", **_screen_context(conn))
     response.headers["X-Screen-Build"] = _screen_build()
     response.headers["X-Screen-Idle"] = str(idle_seconds(conn))
+    response.headers["X-Screen-Night"] = night_for_screen(conn)
     return response

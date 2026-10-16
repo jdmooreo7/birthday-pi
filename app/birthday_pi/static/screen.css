@@ -37,7 +37,7 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); o
   background: var(--card); border-radius: 2.2vh; font-size: 3.5vh; color: var(--muted); min-height: 4vh; }
 /* Night dim: 85% dark from 10pm to 5am while idle; any input lifts it. */
 #night { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity 3s ease; }
-body.night #night { opacity: 0.85; }
+body.night #night { opacity: var(--night-dim, 0.85); }  /* Grandma's choice, set by screen.js */
 body.idle-cursor { cursor: none; }
 /* Reminders (mockups "One reminder" and "Three reminders"). */
 .reminders { height: 100%; box-sizing: border-box; padding: 4.4vh 5vw; display: flex; flex-direction: column; gap: 2.6vh; }

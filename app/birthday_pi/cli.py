@@ -4,7 +4,7 @@ import getpass
 import sys
 from datetime import date, timedelta
 
-from . import db, devices, pins
+from . import PRODUCT, db, devices, pins
 
 USAGE = """\
   reset-pin            Choose a new PIN for Grandma (asks twice). Her phones must enter it again.
@@ -16,7 +16,7 @@ USAGE = """\
 def reset_pin(args) -> int:
     conn = db.connect()
     if not db.is_set_up(conn):
-        print("Birthday Pi isn't set up yet. Open the setup page on a phone instead.")
+        print(f"{PRODUCT} isn't set up yet. Open the setup page on a phone instead.")
         return 1
     pin = args.pin
     if pin is None:
@@ -127,7 +127,7 @@ def pilot_stats(conn, today: date, days: int = 7) -> list[str]:
     added = conn.execute("SELECT COUNT(*) FROM photos WHERE created_at > ?", (since.isoformat(),)).fetchone()[0]
     lines.append(f"Photos added: {added}; waiting for Grandma's OK: {pending[0]}{oldest}")
     lines.append(f"Faces waiting for \"Is this ...?\": {len(naming.asking(conn))}")
-    lines.append(f"People in Birthday Pi: {conn.execute('SELECT COUNT(*) FROM people').fetchone()[0]}")
+    lines.append(f"People in {PRODUCT}: {conn.execute('SELECT COUNT(*) FROM people').fetchone()[0]}")
     return lines
 
 
@@ -163,7 +163,7 @@ def _sample_photos(conn, ids: dict[str, int]) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="birthday_pi.cli", description="Birthday Pi commands",
+    parser = argparse.ArgumentParser(prog="birthday_pi.cli", description=f"{PRODUCT} commands",
                                      formatter_class=argparse.RawDescriptionHelpFormatter, epilog=USAGE)
     sub = parser.add_subparsers(dest="command", required=True)
     p = sub.add_parser("reset-pin", help="choose a new PIN for Grandma")

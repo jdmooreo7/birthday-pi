@@ -33,5 +33,5 @@
   <button class="btn secondary" type="submit">Save who's in it</button>
 </form>
 <a class="btn quiet" href="/photos">All photos</a>
-{% if trusted_owner and photo.status != "pending" %}<a class="btn quiet" href="/photos/{{ photo.id }}/delete">Delete from Birthday Pi</a>{% endif %}
+{% if trusted_owner and photo.status != "pending" %}<a class="btn quiet" href="/photos/{{ photo.id }}/delete">Delete from {{ product }}</a>{% endif %}
 {% endblock %}

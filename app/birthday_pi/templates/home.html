@@ -35,7 +35,7 @@
 {% if to_check %}
 <a class="card" href="/faces/ask" style="text-decoration: none; color: inherit">
   <span class="name">{{ to_check }} face{{ "" if to_check == 1 else "s" }} to check</span>
-  <span class="muted small">New photos: is this who Birthday Pi thinks it is?</span>
+  <span class="muted small">New photos: is this who {{ product }} thinks it is?</span>
 </a>
 {% endif %}
 {% if to_name %}
@@ -66,5 +66,6 @@
   <p class="muted">Nothing in the next 60 days.{% if people_count <= 1 %} Add someone's birthday and it shows up here.{% endif %}</p>
   {% endfor %}
 </section>
+{% if trusted_owner %}<a class="btn secondary" href="/settings/night">Screen at night</a>{% endif %}
 {% if trusted_owner %}<a class="btn quiet" href="/settings/date">Testing: date and photo timing</a>{% endif %}
 {% endblock %}

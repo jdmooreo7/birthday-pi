@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Screen at night{% endblock %}
+{% block content %}
+<div>
+  <h1>Screen at night</h1>
+  <p class="muted">{% if trusted_owner %}Only you can change this.{% else %}Only {{ owner.name }} can change this.{% endif %}</p>
+</div>
+<form method="post" action="/settings/night" id="night-form">
+  <fieldset{% if not trusted_owner %} disabled{% endif %}>
+    <legend>Dim the screen at night</legend>
+    <div class="row2 seg">
+      <input type="radio" id="on-1" name="on" value="1"{% if night.on %} checked{% endif %}><label for="on-1">On</label>
+      <input type="radio" id="on-0" name="on" value="0"{% if not night.on %} checked{% endif %}><label for="on-0">Off</label>
+    </div>
+  </fieldset>
+
+  <fieldset id="night-when"{% if not trusted_owner %} disabled{% endif %}{% if not night.on %} hidden{% endif %}>
+    <div class="row2">
+      {% for key, title in (("start", "From"), ("end", "Until")) %}
+      <div class="stepper">
+        <span class="muted">{{ title }}</span>
+        <output id="{{ key }}-label">{{ hour_label(night[key]) }}</output>
+        <input type="hidden" name="{{ key }}" value="{{ night[key] }}">
+        <div class="row2">
+          <button type="button" data-for="{{ key }}" data-step="-1" aria-label="{{ title }}: earlier">−</button>
+          <button type="button" data-for="{{ key }}" data-step="1" aria-label="{{ title }}: later">+</button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <p class="name sub">How dark</p>
+    <div class="levels">
+      {% for key, (name, opacity, note) in LEVELS.items() %}
+      <input type="radio" id="level-{{ key }}" name="level" value="{{ key }}" data-note="{{ note }}"{% if night.level == key %} checked{% endif %}>
+      <label for="level-{{ key }}"><span class="mini" aria-hidden="true">8:42<span style="opacity: {{ opacity }}"></span></span>{{ name }}</label>
+      {% endfor %}
+    </div>
+    <p class="muted small" id="level-note">{{ LEVELS[night.level][2] }}</p>
+  </fieldset>
+
+  <p class="card" id="night-off"{% if night.on %} hidden{% endif %}>The screen stays bright all night. A new reminder still shows straight away.</p>
+
+  {% if saved %}<div class="notice" role="status"><b>Saved.</b> The screen changes within 10 seconds.</div>{% endif %}
+  {% if trusted_owner %}<button class="btn" type="submit">Save</button>{% endif %}
+</form>
+<a class="btn quiet" href="/">Back</a>
+<script>
+(function () {
+  var form = document.getElementById("night-form");
+  Array.prototype.forEach.call(form.querySelectorAll("[data-step]"), function (b) {
+    b.addEventListener("click", function () {
+      var input = form.elements[b.dataset.for];
+      var h = (Number(input.value) + Number(b.dataset.step) + 24) % 24;
+      input.value = h;
+      document.getElementById(b.dataset.for + "-label").textContent = (h % 12 || 12) + (h < 12 ? " am" : " pm");
+    });
+  });
+  form.addEventListener("change", function (e) {
+    if (e.target.name === "on") {
+      document.getElementById("night-when").hidden = e.target.value === "0";
+      document.getElementById("night-off").hidden = e.target.value !== "0";
+    }
+    if (e.target.name === "level") document.getElementById("level-note").textContent = e.target.dataset.note;
+  });
+})();
+</script>
+{% endblock %}

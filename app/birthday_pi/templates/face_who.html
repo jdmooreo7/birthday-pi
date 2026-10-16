@@ -17,7 +17,7 @@
   <p class="muted small">If someone already has this name, these photos go to them.</p>
 </form>
 <form method="post" action="/faces/{{ group.id }}/who">
-  <h2>Or pick someone already in Birthday Pi</h2>
+  <h2>Or pick someone already in {{ product }}</h2>
   <div class="list">
     {% for p in people %}
     <button class="choice" type="submit" name="person_id" value="{{ p.id }}">
