@@ -7,6 +7,8 @@
 ## What it is, in one sentence
 A screen in Grandma's home that keeps the family's birthdays, anniversaries and photos in front of her, run by a small box in the house, with nothing in the cloud.
 
+**What sets it apart (PO, 2026-10-16):** it's a digital photo frame that *remembers*: the reminders for the days that matter, and how simple it is to use. A name and icon should carry photos and remembering together, not birthdays alone.
+
 ## Who says the name
 - **Grandma**, out loud, to a grandchild on the phone: "It's on the ___." It should sound like part of the home, not a gadget.
 - **The family member who sets it up**, searching for it and telling a cousin about it.
