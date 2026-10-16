@@ -5,9 +5,9 @@
   <h1>Who's in your photos?</h1>
   {% set offered = todo | length + named_groups %}
   {% if offered %}
-  <p class="muted">Birthday Pi found {{ offered }} {{ "person" if offered == 1 else "people" }} in {{ offered_at }} or more photos. Name them so their photos show on their day.</p>
+  <p class="muted">{{ product }} found {{ offered }} {{ "person" if offered == 1 else "people" }} in {{ offered_at }} or more photos. Name them so their photos show on their day.</p>
   {% else %}
-  <p class="muted">Nobody is in {{ offered_at }} or more photos yet. Add photos and Birthday Pi will find the faces in them.</p>
+  <p class="muted">Nobody is in {{ offered_at }} or more photos yet. Add photos and {{ product }} will find the faces in them.</p>
   {% endif %}
 </div>
 {% if not running %}<div class="notice">The face finder isn't running, so new photos aren't being looked at. On the Pi, run <code>docker compose up -d</code>.</div>{% endif %}

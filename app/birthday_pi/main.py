@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 
-from . import db, devices, naming, photos, pins, reminders
+from . import PRODUCT, db, devices, naming, photos, pins, reminders
 from .dates import ANNIVERSARY_TYPES, MONTHS, how_far, missing_birthdays, short_date, upcoming, valid_month_day
 
 HERE = Path(__file__).parent
@@ -38,7 +38,8 @@ def static_url(name: str) -> str:
     return f"/static/{name}?v={digest}"
 
 
-templates.env.globals.update(MONTHS=MONTHS, how_far=how_far, short_date=short_date, static_url=static_url)
+templates.env.globals.update(MONTHS=MONTHS, how_far=how_far, short_date=short_date, static_url=static_url,
+                             product=PRODUCT)
 
 
 class RedirectTo(Exception):

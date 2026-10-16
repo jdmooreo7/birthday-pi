@@ -239,3 +239,10 @@ def test_database_waits_for_a_busy_sd_card(tmp_path, monkeypatch):
     conn = db.connect()
     assert conn.execute("PRAGMA busy_timeout").fetchone()[0] == 30000
     assert conn.execute("PRAGMA synchronous").fetchone()[0] == 1  # NORMAL
+
+
+def test_the_product_name_comes_from_one_place(client, monkeypatch):
+    from birthday_pi import main
+    monkeypatch.setitem(main.templates.env.globals, "product", "Family Screen")
+    page = client.get("/setup").text
+    assert "Welcome to Family Screen" in page and "Birthday Pi" not in page

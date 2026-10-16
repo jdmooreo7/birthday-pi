@@ -11,6 +11,7 @@ from pathlib import Path
 import pillow_heif
 from PIL import Image, ImageOps
 
+from . import PRODUCT
 from .db import data_dir
 from .dates import upcoming
 
@@ -94,7 +95,7 @@ def save_upload(conn: sqlite3.Connection, data: bytes, uploader_id: int, approve
         img.draft("RGB", SCREEN_BOX)
         img = ImageOps.exif_transpose(img).convert("RGB")
     except (OSError, ValueError, Image.DecompressionBombError):
-        raise UploadError("isn't a photo Birthday Pi can read")
+        raise UploadError(f"isn't a photo {PRODUCT} can read")
     img.thumbnail(SCREEN_BOX)
     if _same_photo(conn, img, taken):
         return None
