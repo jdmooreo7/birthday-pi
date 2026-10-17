@@ -21,8 +21,12 @@ A small, local-only family reminder screen for a Raspberry Pi 5. It runs in Dock
 
 1. On another computer, install [Raspberry Pi Imager](https://www.raspberrypi.com/software/) and write **Raspberry Pi OS (64-bit)** to the SD card.
 2. In Imager's settings, set the hostname to **`birthdaypi`** (recommended; it's the address Birthday Pi shows to phones by default), a username and password, your Wi-Fi name and password, and **enable SSH**. This saves you from needing a keyboard and monitor for setup.
-3. Put the card in the Pi, power it on, and give it a minute or two to boot.
-4. Open a terminal **on the Pi**, or connect from your computer:
+   - **SSH:** pick *Allow public-key authentication only*. It's safer: no one on the network can guess a password. If you don't have a key yet, Imager can make one for you. Only the public key (the file ending in `.pub`) goes into Imager. Check the key box shows *your own computer's* key; Imager remembers old settings. On a Mac, `pbcopy < ~/.ssh/id_ed25519.pub` copies it so you can paste it in. If you can't log in afterwards ("Permission denied (publickey)"), the key didn't match: write the card again.
+   - If keys are new to you, password login works too. Choose a strong password you don't use anywhere else.
+   - Either way, keep the password you set: the Pi asks for it when you run `sudo` commands below.
+3. **Wait for Imager to finish.** It writes the card and then checks it, which often takes 15–25 minutes. Don't take the card out until Imager says the write was successful; a card pulled out early won't boot.
+4. Put the card in the Pi and power it on. The first start sets things up and restarts once by itself, so give it about 5 minutes before you connect. If `ssh` says "Connection refused" or can't find the Pi, it's still starting: wait a minute and try again.
+5. Open a terminal **on the Pi**, or connect from your computer:
    ```sh
    ssh <your-username>@<your-hostname>.local
    ```
@@ -56,13 +60,23 @@ sudo apt update
 sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 ```
 
-Now let your user run Docker without `sudo`, then **log out and back in** (or reboot) so it takes effect:
+Now let your user run Docker without `sudo`:
 
 ```sh
 sudo usermod -aG docker $USER
 ```
 
-After logging back in, check that it worked:
+Then turn on memory limits, so one container that misbehaves can't use up all the Pi's memory and freeze the screen. Raspberry Pi OS ships with them off. This adds `cgroup_enable=memory` to the end of the single line in a boot file, keeps a backup, and restarts the Pi (which also lets the Docker change above take effect):
+
+```sh
+sudo cp /boot/firmware/cmdline.txt /boot/firmware/cmdline.txt.bak
+grep -q cgroup_enable=memory /boot/firmware/cmdline.txt || sudo sed -i '$ s/$/ cgroup_enable=memory/' /boot/firmware/cmdline.txt
+sudo reboot
+```
+
+If the Pi doesn't start again, put the SD card in another computer and rename `cmdline.txt.bak` back to `cmdline.txt`. If you skip this step, Birthday Pi still runs, but Docker will say *Your kernel does not support memory limit* when it starts. If you turn them on later, after Birthday Pi is already running, restart the Pi and then run `docker compose up -d --force-recreate` from `~/birthday-pi`; containers made before keep running without limits.
+
+When the Pi is back up (about a minute), connect again and check that it all worked:
 
 ```sh
 docker --version
@@ -70,7 +84,7 @@ docker compose version
 docker run --rm hello-world
 ```
 
-If the last command prints "Hello from Docker!", you're ready. If you see `permission denied`, you haven't logged out and back in yet.
+If the last command prints "Hello from Docker!", you're ready. If you see `permission denied`, the Pi hasn't restarted yet.
 
 ## Step 2: Get Birthday Pi and start it
 
@@ -127,23 +141,12 @@ sudo reboot
 
 When the Pi comes back up, it opens Birthday Pi full-screen. This assumes the repo is at `~/birthday-pi`. The kiosk always opens `http://localhost:8080/screen` on the Pi itself, so it doesn't need the `.env` setting above (if you changed the port, edit it in `kiosk/kiosk.sh`). To turn the kiosk off, delete `~/.config/autostart/birthday-pi-kiosk.desktop`.
 
-## Optional: enforce the memory limit
-
-The compose file caps the app container at 256 MB. On a stock Raspberry Pi OS the kernel's memory controller is off, so Docker may print a warning that the limit isn't enforced. The app still runs. To enforce it, add `cgroup_enable=memory` to the end of the **single line** in `/boot/firmware/cmdline.txt` and reboot. This edits a boot file, so make a backup first and skip it if you're not comfortable:
-
-```sh
-sudo cp /boot/firmware/cmdline.txt /boot/firmware/cmdline.txt.bak
-sudo nano /boot/firmware/cmdline.txt     # add " cgroup_enable=memory" at the end of the line
-sudo reboot
-```
-
-If the Pi doesn't boot, put the SD card in another computer and rename `cmdline.txt.bak` back to `cmdline.txt`.
-
 ## Optional: keep the Pi's own log through a restart
 
-Raspberry Pi OS keeps the system log in memory, so a restart loses the clues to why the screen went blank or the Pi froze. To keep it on the SD card instead (at most 200 MB), from `~/birthday-pi`:
+Raspberry Pi OS keeps the system log in memory, so a restart loses the clues to why the screen went blank or the Pi froze. To keep it on the SD card instead (at most 200 MB):
 
 ```sh
+cd ~/birthday-pi
 sudo mkdir -p /etc/systemd/journald.conf.d
 sudo cp scripts/journald-birthday-pi.conf /etc/systemd/journald.conf.d/50-birthday-pi.conf
 sudo systemctl restart systemd-journald
@@ -155,25 +158,16 @@ To undo: `sudo rm /etc/systemd/journald.conf.d/50-birthday-pi.conf`, then `sudo 
 
 Two dashboards show what the Pi is doing right now: **Netdata** (memory, CPU, temperature and each container, second by second, with alerts) on port 19999, and **Dozzle** (live logs from each container) on port 9080. They're off unless you turn them on, use about 250–350 MB of memory, keep 7 days of metrics on disk (at most 256 MB), and can't reach the internet. They also take about **1.6 GB of disk** for their images (Netdata alone is 1.3 GB), on top of about 0.8 GB for Birthday Pi itself, so leave room on the SD card.
 
-Both ask for a password. Make one once, from `~/birthday-pi`:
+Both ask for a password. This sets one and starts everything with the dashboards:
 
 ```sh
-docker run --rm -it caddy:2.11.7-alpine caddy hash-password
+cd ~/birthday-pi
+scripts/set-dashboard-password.sh
 ```
 
-Type a password when asked. It prints a long line starting with `$2a$`. Add it to the `.env` file in `~/birthday-pi` **inside single quotes**, so the `$` signs are kept:
+It asks for a new password twice (use one you don't use for anything else, not the Pi's own). Only a scrambled copy (a hash) is kept, in `.env`, which only your user can read. Run it again any time to change the password.
 
-```sh
-OBSERVE_PASSWORD_HASH='$2a$14$...the line it printed...'
-```
-
-Then start everything with the dashboards:
-
-```sh
-docker compose --profile observe up -d
-```
-
-Open `http://birthdaypi.local:19999` (metrics) or `http://birthdaypi.local:9080` (logs) and sign in as `admin` with your password. To turn them off: `docker compose --profile observe down`, then `docker compose up -d`. Turning them off doesn't free the disk space; to get it back, also run `docker image rm netdata/netdata:v2.12.0 amir20/dozzle:v11.1.3 caddy:2.11.7-alpine tecnativa/docker-socket-proxy:v0.4.2`.
+Open `http://birthdaypi.local:19999` (metrics) or `http://birthdaypi.local:9080` (logs), using your own hostname if it isn't `birthdaypi`, and sign in as `admin` with your password. To turn them off: `docker compose --profile observe down`, then `docker compose up -d`. Turning them off doesn't free the disk space; to get it back, also run `docker image rm netdata/netdata:v2.12.0 amir20/dozzle:v11.1.3 caddy:2.11.7-alpine tecnativa/docker-socket-proxy:v0.4.2`.
 
 ## Everyday commands
 
@@ -186,6 +180,7 @@ Run these from `~/birthday-pi`:
 | Start it again | `docker compose up -d` |
 | Update to the latest version | `scripts/update.sh` (goes back to the previous version by itself if anything isn't healthy afterwards) |
 | Copy the family's data to a USB stick | `scripts/backup-data.sh /media/$USER/<stick name>` (keeps the newest 4; the stick holds photos and faces, so keep it safe) |
+| Set or change the dashboards password | `scripts/set-dashboard-password.sh` |
 | Save what's going on before a reboot, for whoever helps you | `scripts/diag.sh` (logs and numbers only, kept on the Pi in `~/birthday-pi-diag`) |
 | Grandma forgot her PIN | `docker compose exec app python -m birthday_pi.cli reset-pin` (her phones will ask for the new PIN) |
 
