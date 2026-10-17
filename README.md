@@ -74,7 +74,7 @@ grep -q cgroup_enable=memory /boot/firmware/cmdline.txt || sudo sed -i '$ s/$/ c
 sudo reboot
 ```
 
-If the Pi doesn't start again, put the SD card in another computer and rename `cmdline.txt.bak` back to `cmdline.txt`. If you skip this step, Birthday Pi still runs, but Docker will say *Your kernel does not support memory limit* when it starts.
+If the Pi doesn't start again, put the SD card in another computer and rename `cmdline.txt.bak` back to `cmdline.txt`. If you skip this step, Birthday Pi still runs, but Docker will say *Your kernel does not support memory limit* when it starts. If you turn them on later, after Birthday Pi is already running, restart the Pi and then run `docker compose up -d --force-recreate` from `~/birthday-pi`; containers made before keep running without limits.
 
 When the Pi is back up (about a minute), connect again and check that it all worked:
 
