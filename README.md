@@ -21,6 +21,9 @@ A small, local-only family reminder screen for a Raspberry Pi 5. It runs in Dock
 
 1. On another computer, install [Raspberry Pi Imager](https://www.raspberrypi.com/software/) and write **Raspberry Pi OS (64-bit)** to the SD card.
 2. In Imager's settings, set the hostname to **`birthdaypi`** (recommended; it's the address Birthday Pi shows to phones by default), a username and password, your Wi-Fi name and password, and **enable SSH**. This saves you from needing a keyboard and monitor for setup.
+   - **SSH:** pick *Allow public-key authentication only*. It's safer: no one on the network can guess a password. If you don't have a key yet, Imager can make one for you. Only the public key (the file ending in `.pub`) goes into Imager.
+   - If keys are new to you, password login works too. Choose a strong password you don't use anywhere else.
+   - Either way, keep the password you set: the Pi asks for it when you run `sudo` commands below.
 3. Put the card in the Pi, power it on, and give it a minute or two to boot.
 4. Open a terminal **on the Pi**, or connect from your computer:
    ```sh
