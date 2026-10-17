@@ -60,13 +60,23 @@ sudo apt update
 sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 ```
 
-Now let your user run Docker without `sudo`, then **log out and back in** (or reboot) so it takes effect:
+Now let your user run Docker without `sudo`:
 
 ```sh
 sudo usermod -aG docker $USER
 ```
 
-After logging back in, check that it worked:
+Then turn on memory limits, so one container that misbehaves can't use up all the Pi's memory and freeze the screen. Raspberry Pi OS ships with them off. This adds `cgroup_enable=memory` to the end of the single line in a boot file, keeps a backup, and restarts the Pi (which also lets the Docker change above take effect):
+
+```sh
+sudo cp /boot/firmware/cmdline.txt /boot/firmware/cmdline.txt.bak
+grep -q cgroup_enable=memory /boot/firmware/cmdline.txt || sudo sed -i '$ s/$/ cgroup_enable=memory/' /boot/firmware/cmdline.txt
+sudo reboot
+```
+
+If the Pi doesn't start again, put the SD card in another computer and rename `cmdline.txt.bak` back to `cmdline.txt`. If you skip this step, Birthday Pi still runs, but Docker will say *Your kernel does not support memory limit* when it starts.
+
+When the Pi is back up (about a minute), connect again and check that it all worked:
 
 ```sh
 docker --version
@@ -74,7 +84,7 @@ docker compose version
 docker run --rm hello-world
 ```
 
-If the last command prints "Hello from Docker!", you're ready. If you see `permission denied`, you haven't logged out and back in yet.
+If the last command prints "Hello from Docker!", you're ready. If you see `permission denied`, the Pi hasn't restarted yet.
 
 ## Step 2: Get Birthday Pi and start it
 
@@ -130,18 +140,6 @@ sudo reboot
 ```
 
 When the Pi comes back up, it opens Birthday Pi full-screen. This assumes the repo is at `~/birthday-pi`. The kiosk always opens `http://localhost:8080/screen` on the Pi itself, so it doesn't need the `.env` setting above (if you changed the port, edit it in `kiosk/kiosk.sh`). To turn the kiosk off, delete `~/.config/autostart/birthday-pi-kiosk.desktop`.
-
-## Optional: enforce the memory limit
-
-The compose file caps the app container at 256 MB. On a stock Raspberry Pi OS the kernel's memory controller is off, so Docker may print a warning that the limit isn't enforced. The app still runs. To enforce it, add `cgroup_enable=memory` to the end of the **single line** in `/boot/firmware/cmdline.txt` and reboot. This edits a boot file, so make a backup first and skip it if you're not comfortable:
-
-```sh
-sudo cp /boot/firmware/cmdline.txt /boot/firmware/cmdline.txt.bak
-sudo nano /boot/firmware/cmdline.txt     # add " cgroup_enable=memory" at the end of the line
-sudo reboot
-```
-
-If the Pi doesn't boot, put the SD card in another computer and rename `cmdline.txt.bak` back to `cmdline.txt`.
 
 ## Optional: keep the Pi's own log through a restart
 
