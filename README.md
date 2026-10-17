@@ -24,8 +24,8 @@ A small, local-only family reminder screen for a Raspberry Pi 5. It runs in Dock
    - **SSH:** pick *Allow public-key authentication only*. It's safer: no one on the network can guess a password. If you don't have a key yet, Imager can make one for you. Only the public key (the file ending in `.pub`) goes into Imager. Check the key box shows *your own computer's* key; Imager remembers old settings. On a Mac, `pbcopy < ~/.ssh/id_ed25519.pub` copies it so you can paste it in. If you can't log in afterwards ("Permission denied (publickey)"), the key didn't match: write the card again.
    - If keys are new to you, password login works too. Choose a strong password you don't use anywhere else.
    - Either way, keep the password you set: the Pi asks for it when you run `sudo` commands below.
-3. **Wait for Imager to finish.** It writes the card and then checks it, which often takes 10–20 minutes. Don't take the card out until Imager says the write was successful; a card pulled out early won't boot.
-4. Put the card in the Pi and power it on. The first start sets things up and restarts once by itself, so give it about 5 minutes before you connect.
+3. **Wait for Imager to finish.** It writes the card and then checks it, which often takes 15–25 minutes. Don't take the card out until Imager says the write was successful; a card pulled out early won't boot.
+4. Put the card in the Pi and power it on. The first start sets things up and restarts once by itself, so give it about 5 minutes before you connect. If `ssh` says "Connection refused" or can't find the Pi, it's still starting: wait a minute and try again.
 5. Open a terminal **on the Pi**, or connect from your computer:
    ```sh
    ssh <your-username>@<your-hostname>.local
