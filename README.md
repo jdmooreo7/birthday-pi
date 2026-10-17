@@ -158,24 +158,14 @@ To undo: `sudo rm /etc/systemd/journald.conf.d/50-birthday-pi.conf`, then `sudo 
 
 Two dashboards show what the Pi is doing right now: **Netdata** (memory, CPU, temperature and each container, second by second, with alerts) on port 19999, and **Dozzle** (live logs from each container) on port 9080. They're off unless you turn them on, use about 250–350 MB of memory, keep 7 days of metrics on disk (at most 256 MB), and can't reach the internet. They also take about **1.6 GB of disk** for their images (Netdata alone is 1.3 GB), on top of about 0.8 GB for Birthday Pi itself, so leave room on the SD card.
 
-Both ask for a password. Make one once:
+Both ask for a password. This sets one and starts everything with the dashboards:
 
 ```sh
 cd ~/birthday-pi
-docker run --rm -it caddy:2.11.7-alpine caddy hash-password
+scripts/set-dashboard-password.sh
 ```
 
-Type a password when asked. It prints a long line starting with `$2a$`. Open the `.env` file with `nano .env` and add it on a new line, **inside single quotes**, so the `$` signs are kept (save with Ctrl+O, Enter, then Ctrl+X):
-
-```sh
-OBSERVE_PASSWORD_HASH='$2a$14$...the line it printed...'
-```
-
-Then start everything with the dashboards:
-
-```sh
-docker compose --profile observe up -d
-```
+It asks for a new password twice (use one you don't use for anything else, not the Pi's own). Only a scrambled copy (a hash) is kept, in `.env`, which only your user can read. Run it again any time to change the password.
 
 Open `http://birthdaypi.local:19999` (metrics) or `http://birthdaypi.local:9080` (logs), using your own hostname if it isn't `birthdaypi`, and sign in as `admin` with your password. To turn them off: `docker compose --profile observe down`, then `docker compose up -d`. Turning them off doesn't free the disk space; to get it back, also run `docker image rm netdata/netdata:v2.12.0 amir20/dozzle:v11.1.3 caddy:2.11.7-alpine tecnativa/docker-socket-proxy:v0.4.2`.
 
@@ -190,6 +180,7 @@ Run these from `~/birthday-pi`:
 | Start it again | `docker compose up -d` |
 | Update to the latest version | `scripts/update.sh` (goes back to the previous version by itself if anything isn't healthy afterwards) |
 | Copy the family's data to a USB stick | `scripts/backup-data.sh /media/$USER/<stick name>` (keeps the newest 4; the stick holds photos and faces, so keep it safe) |
+| Set or change the dashboards password | `scripts/set-dashboard-password.sh` |
 | Save what's going on before a reboot, for whoever helps you | `scripts/diag.sh` (logs and numbers only, kept on the Pi in `~/birthday-pi-diag`) |
 | Grandma forgot her PIN | `docker compose exec app python -m birthday_pi.cli reset-pin` (her phones will ask for the new PIN) |
 
