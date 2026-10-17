@@ -143,9 +143,10 @@ When the Pi comes back up, it opens Birthday Pi full-screen. This assumes the re
 
 ## Optional: keep the Pi's own log through a restart
 
-Raspberry Pi OS keeps the system log in memory, so a restart loses the clues to why the screen went blank or the Pi froze. To keep it on the SD card instead (at most 200 MB), from `~/birthday-pi`:
+Raspberry Pi OS keeps the system log in memory, so a restart loses the clues to why the screen went blank or the Pi froze. To keep it on the SD card instead (at most 200 MB):
 
 ```sh
+cd ~/birthday-pi
 sudo mkdir -p /etc/systemd/journald.conf.d
 sudo cp scripts/journald-birthday-pi.conf /etc/systemd/journald.conf.d/50-birthday-pi.conf
 sudo systemctl restart systemd-journald
@@ -157,13 +158,14 @@ To undo: `sudo rm /etc/systemd/journald.conf.d/50-birthday-pi.conf`, then `sudo 
 
 Two dashboards show what the Pi is doing right now: **Netdata** (memory, CPU, temperature and each container, second by second, with alerts) on port 19999, and **Dozzle** (live logs from each container) on port 9080. They're off unless you turn them on, use about 250–350 MB of memory, keep 7 days of metrics on disk (at most 256 MB), and can't reach the internet. They also take about **1.6 GB of disk** for their images (Netdata alone is 1.3 GB), on top of about 0.8 GB for Birthday Pi itself, so leave room on the SD card.
 
-Both ask for a password. Make one once, from `~/birthday-pi`:
+Both ask for a password. Make one once:
 
 ```sh
+cd ~/birthday-pi
 docker run --rm -it caddy:2.11.7-alpine caddy hash-password
 ```
 
-Type a password when asked. It prints a long line starting with `$2a$`. Add it to the `.env` file in `~/birthday-pi` **inside single quotes**, so the `$` signs are kept:
+Type a password when asked. It prints a long line starting with `$2a$`. Open the `.env` file with `nano .env` and add it on a new line, **inside single quotes**, so the `$` signs are kept (save with Ctrl+O, Enter, then Ctrl+X):
 
 ```sh
 OBSERVE_PASSWORD_HASH='$2a$14$...the line it printed...'
@@ -175,7 +177,7 @@ Then start everything with the dashboards:
 docker compose --profile observe up -d
 ```
 
-Open `http://birthdaypi.local:19999` (metrics) or `http://birthdaypi.local:9080` (logs) and sign in as `admin` with your password. To turn them off: `docker compose --profile observe down`, then `docker compose up -d`. Turning them off doesn't free the disk space; to get it back, also run `docker image rm netdata/netdata:v2.12.0 amir20/dozzle:v11.1.3 caddy:2.11.7-alpine tecnativa/docker-socket-proxy:v0.4.2`.
+Open `http://birthdaypi.local:19999` (metrics) or `http://birthdaypi.local:9080` (logs), using your own hostname if it isn't `birthdaypi`, and sign in as `admin` with your password. To turn them off: `docker compose --profile observe down`, then `docker compose up -d`. Turning them off doesn't free the disk space; to get it back, also run `docker image rm netdata/netdata:v2.12.0 amir20/dozzle:v11.1.3 caddy:2.11.7-alpine tecnativa/docker-socket-proxy:v0.4.2`.
 
 ## Everyday commands
 
