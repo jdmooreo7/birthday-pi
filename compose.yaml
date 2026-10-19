@@ -60,6 +60,12 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks: [observe]
     mem_limit: 32m
+    healthcheck:  # so Dozzle waits for it instead of failing once at startup
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2375/_ping"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      start_interval: 1s
 
   netdata:
     image: netdata/netdata:v2.12.0
@@ -94,6 +100,8 @@ services:
     environment:
       DOCKER_HOST: tcp://docker-proxy:2375
       DOZZLE_NO_ANALYTICS: "true"
+    depends_on:
+      docker-proxy: {condition: service_healthy}
     tmpfs: [/data]
     networks: [observe]
     mem_limit: 96m  # peaked at 46 MB; it grows while someone reads logs
