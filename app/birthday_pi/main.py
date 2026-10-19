@@ -760,7 +760,28 @@ def faces_list(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
     beat = db.get_setting(conn, "faces_heartbeat")
     running = bool(beat) and (datetime.now() - datetime.fromisoformat(beat)).total_seconds() < FACE_WORKER_LATE
     return page(request, "faces.html", device=device, todo=todo, shown=shown, strips=strips, named=named,
-                named_groups=named_groups, counts=counts, running=running, offered_at=naming.OFFERED_AT)
+                named_groups=named_groups, counts=counts, running=running, offered_at=naming.OFFERED_AT,
+                set_aside=len(naming.set_aside(conn)), undo=_undo_strip(conn, request))
+
+
+def _undo_strip(conn: sqlite3.Connection, request: Request) -> dict | None:
+    """The "Set aside: not family. Undo" strip, on the page she lands on straight after setting a group aside.
+    It goes with her next tap, since that loads a page without ?set_aside."""
+    g = naming.group(conn, _int_param(request, "set_aside"))
+    if g is None or g["ignored"] not in naming.IGNORE_REASONS:
+        return None
+    return {"group": g, "label": naming.IGNORE_REASONS[g["ignored"]], "faces": naming.face_ids(conn, g["id"], limit=1)}
+
+
+# Set aside: groups she said aren't family or aren't people, to name after all. Declared before
+# /faces/{group_id} so "set-aside" isn't read as a group id.
+@app.get("/faces/set-aside")
+def faces_set_aside(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    device = require_trusted_owner(conn, request)
+    groups = naming.set_aside(conn)
+    strips = {g["id"]: naming.face_ids(conn, g["id"], limit=3) for g in groups}
+    return page(request, "face_set_aside.html", device=device, groups=groups, strips=strips,
+                labels=naming.IGNORE_REASONS)
 
 
 # "Is this Leo?" (M7): faces in new photos the faces worker wasn't sure about. Declared before
@@ -811,7 +832,7 @@ def face_group(group_id: int, request: Request, conn: sqlite3.Connection = Depen
     todo = [t["id"] for t in naming.to_name(conn)]
     return page(request, "face_group.html", device=device, group=g, faces=naming.face_ids(conn, group_id),
                 position=(todo.index(group_id) + 1) if group_id in todo else None, total=len(todo),
-                skip_to=naming.next_after(conn, group_id))
+                skip_to=naming.next_after(conn, group_id), undo=_undo_strip(conn, request))
 
 
 @app.post("/faces/{group_id}")
@@ -831,7 +852,8 @@ async def face_group_save(group_id: int, request: Request, conn: sqlite3.Connect
     if action in naming.IGNORE_REASONS:
         naming.ignore(conn, group_id, action)
         after = naming.next_after(conn, group_id)
-        return RedirectResponse(f"/faces/{after}" if after else "/faces", status_code=303)
+        return RedirectResponse(f"/faces/{after}?set_aside={group_id}" if after else f"/faces?set_aside={group_id}",
+                                status_code=303)
     return RedirectResponse(f"/faces/{group_id}/who", status_code=303)
 
 
@@ -888,6 +910,17 @@ def face_undo(group_id: int, request: Request, conn: sqlite3.Connection = Depend
     _get_group(conn, group_id)
     naming.unname(conn, group_id)
     return RedirectResponse(f"/faces/{group_id}/who", status_code=303)
+
+
+@app.post("/faces/{group_id}/unignore")
+async def face_unignore(group_id: int, request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    """Undo goes back to the group as it was; "Name them after all" goes on to "Who is this?"."""
+    require_trusted_owner(conn, request)
+    _get_group(conn, group_id)
+    form = await request.form()
+    naming.unignore(conn, group_id)
+    then = "/who" if form.get("then") == "who" else ""
+    return RedirectResponse(f"/faces/{group_id}{then}", status_code=303)
 
 
 # "Is this all Leo?" (M7): every face named as someone, to take out the ones that aren't them.
