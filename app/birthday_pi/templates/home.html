@@ -12,10 +12,23 @@
   </form>
 </div>
 {% endfor %}
+{% for c in remembering %}
+<div class="card remember">
+  <span class="muted small">Today</span>
+  <span class="name">Remembering {{ c.name }}</span>
+  {% if c.extra %}<span class="muted small">{{ c.extra[:1] | upper }}{{ c.extra[1:] }}</span>{% endif %}
+</div>
+{% endfor %}
+{% if trusted_owner %}
+<a class="see-screen" href="/screen">
+  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#ffb347" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+  <span><span class="name">See the screen</span><span class="small">What's on the TV right now</span></span>
+</a>
+{% endif %}
 {% if people_count <= 1 %}
 <div class="card warm">
   <h2>Let's add the family</h2>
-  <p>Add the people {{ device.name if device.is_owner else "Grandma" }} wants to remember, with their birthdays.</p>
+  <p>Add the people {{ owner_name }} wants to remember, with their birthdays and special dates.</p>
   <a class="btn" href="/people/new">Add a person</a>
 </div>
 {% else %}
@@ -30,7 +43,7 @@
   <a class="btn secondary" style="width: auto; min-height: 48px" href="/photos/review">Review</a></div>
 </div>
 {% elif my_pending %}
-<div class="card"><span class="name">{{ my_pending }} of your photos {{ "is" if my_pending == 1 else "are" }} waiting for Grandma's OK</span></div>
+<div class="card"><span class="name">{{ my_pending }} of your photos {{ "is" if my_pending == 1 else "are" }} waiting for {{ owner_name | possessive }} OK</span></div>
 {% endif %}
 {% if to_check %}
 <a class="card" href="/faces/ask" style="text-decoration: none; color: inherit">

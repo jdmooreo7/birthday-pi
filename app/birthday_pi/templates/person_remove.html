@@ -2,7 +2,7 @@
 {% block title %}Remove {{ person.name }}{% endblock %}
 {% block content %}
 <h1>Remove {{ person.name }}?</h1>
-<p>Their birthday, any anniversary and their face in your photos are removed from {{ product }}. The photos stay. This can't be undone.</p>
+<p>Their birthday, any special dates and their face in your photos are removed from {{ product }}. The photos stay. This can't be undone.</p>
 <form method="post" action="/people/{{ person.id }}/remove">
   <button class="btn danger" type="submit">Remove {{ person.name }}</button>
 </form>

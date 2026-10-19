@@ -1,0 +1,8 @@
+{# Straight after "Not family" or "Not a person". The Undo button belongs to the page's own #undo form. #}
+{% if undo %}
+<div class="undo-strip" role="status">
+  <span class="face-strip">{% for f in undo.faces %}<img src="/face-files/{{ f }}.jpg" alt="">{% endfor %}</span>
+  <span class="grow">Set aside: {{ undo.label | lower }}</span>
+  <button class="btn" type="submit" form="undo">Undo</button>
+</div>
+{% endif %}

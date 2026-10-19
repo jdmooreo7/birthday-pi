@@ -15,16 +15,19 @@ CREATE TABLE IF NOT EXISTS people (
     birth_month INTEGER,
     birth_day   INTEGER,
     birth_year  INTEGER,
+    remembered  INTEGER NOT NULL DEFAULT 0,  -- someone the family is remembering: their days are quiet
     created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
--- A person's anniversaries; kind is a key of dates.ANNIVERSARY_TYPES.
+-- A person's special dates (called anniversaries in early builds); kind is a key of dates.SPECIAL_DATE_TYPES,
+-- and label is the family's own name for an "other" one.
 CREATE TABLE IF NOT EXISTS anniversaries (
     id        INTEGER PRIMARY KEY,
     person_id INTEGER NOT NULL REFERENCES people(id) ON DELETE CASCADE,
     kind      TEXT NOT NULL,
     month     INTEGER NOT NULL,
     day       INTEGER NOT NULL,
-    year      INTEGER
+    year      INTEGER,
+    label     TEXT
 );
 -- "Got it" on a reminder; key is "<p|a><id>:<stage>:<celebration date>".
 CREATE TABLE IF NOT EXISTS reminder_acks (
@@ -116,6 +119,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("UPDATE faces SET confirmed = 1 WHERE group_id IN (SELECT id FROM face_groups WHERE person_id IS NOT NULL)")
     _add_column(conn, "faces", "ask_group", "INTEGER")  # M7
     _add_column(conn, "photos", "look", "INTEGER")  # M7; filled in when a photo taken at the same moment arrives
+    _add_column(conn, "people", "remembered", "INTEGER NOT NULL DEFAULT 0")  # v0.2.1
     # Early M1 builds stored one anniversary per couple; keep it as person_a's wedding anniversary.
     cols = [r["name"] for r in conn.execute("PRAGMA table_info(anniversaries)")]
     if "person_a" in cols:
@@ -135,6 +139,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
             DROP TABLE anniversaries_old;
             COMMIT;
         """)
+    _add_column(conn, "anniversaries", "label", "TEXT")  # v0.2.1: the name of a special date of their own
 
 
 def _add_column(conn: sqlite3.Connection, table: str, column: str, decl: str) -> bool:

@@ -38,7 +38,13 @@
     </form>
   </div>
   {% endfor %}
-  {% if pending %}<div class="next"><a class="look" href="/screen/approve">{{ pending }} new photo{{ "" if pending == 1 else "s" }} for Grandma's OK · Look</a></div>{% endif %}
+  {% for c in remembering %}
+  <div class="remember-strip">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10z"/></svg>
+    <span class="also">Also today</span><span class="who">Remembering {{ c.name }}</span>{% if c.extra %}<span class="also">· {{ c.extra }}</span>{% endif %}
+  </div>
+  {% endfor %}
+  {% if pending %}<div class="next"><a class="look" href="/screen/approve">{{ pending }} new photo{{ "" if pending == 1 else "s" }} for {{ owner_name | possessive }} OK · Look</a></div>{% endif %}
   {% if more_reminders %}<div class="more">+ {{ more_reminders }} more on your phone</div>
   {% elif reminders | length == 1 and next_up %}
   <div class="next"><b>Next:</b> {% for c in next_up %}{{ c.name }} · {{ short_date(c.when) }}{% if not loop.last %} &nbsp;·&nbsp; {% endif %}{% endfor %}</div>
@@ -51,7 +57,15 @@
       <div id="clock">{{ now.strftime("%-I:%M") }}</div>
       <div id="date">{{ today.strftime("%A, %B") }} {{ today.day }}{% if pretend or test_idle %} <span class="pretend">testing</span>{% endif %}</div>
     </div>
+    <div class="phone-photo" aria-hidden="true"></div>
     <div class="coming">
+      {% for c in remembering %}
+      <div class="remember-card">
+        <div class="today"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10z"/></svg>Today</div>
+        <div class="who">Remembering {{ c.name }}</div>
+        {% if c.extra %}<div class="also">{{ c.extra[:1] | upper }}{{ c.extra[1:] }}</div>{% endif %}
+      </div>
+      {% endfor %}
       <h2>Coming up</h2>
       {% for c in upcoming %}
       <div class="event">
@@ -66,8 +80,8 @@
   </div>
   <div class="status">
     <span>{% if missing_count %}{{ missing_count }} {{ "person still needs" if missing_count == 1 else "people still need" }} a birthday{% endif %}</span>
-    {% if pending %}<a class="look" href="/screen/approve">{{ pending }} new photo{{ "" if pending == 1 else "s" }} for Grandma's OK · Look</a>
-    {% else %}<span>Add birthdays from a phone: {{ phone_url }}</span>{% endif %}
+    {% if pending %}<a class="look" href="/screen/approve">{{ pending }} new photo{{ "" if pending == 1 else "s" }} for {{ owner_name | possessive }} OK · Look</a>
+    {% else %}<span class="phone-url">Add birthdays from a phone: {{ phone_url }}</span>{% endif %}
   </div>
 </div>
 {% endif %}

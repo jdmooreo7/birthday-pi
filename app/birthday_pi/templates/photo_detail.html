@@ -2,7 +2,7 @@
 {% block title %}Photo{% endblock %}
 {% block content %}
 <img class="photo" src="/photo-files/{{ photo.id }}.jpg" alt="Photo added by {{ photo.uploader or 'someone' }}">
-<p class="muted small">Added by {{ photo.uploader or "someone" }}{% if photo.status == "pending" %} · waiting for Grandma's OK{% elif photo.hidden %} · hidden from the screen{% endif %}</p>
+<p class="muted small">Added by {{ photo.uploader or "someone" }}{% if photo.status == "pending" %} · waiting for {{ owner_name | possessive }} OK{% elif photo.hidden %} · hidden from the screen{% endif %}</p>
 {% if trusted_owner %}
   {% if photo.status == "pending" %}
   <form method="post" action="/photos/{{ photo.id }}/decision" class="row2">

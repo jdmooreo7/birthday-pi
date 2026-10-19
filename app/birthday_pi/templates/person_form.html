@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ person.name if person else "Add a person" }}{% endblock %}
 {% block content %}
-{% if welcome %}<div class="notice">Hi {{ person.name }}! Add your own birthday so Grandma remembers it, or skip this for now.</div>{% endif %}
+{% if welcome %}<div class="notice">Hi {{ person.name }}! Add your own birthday so {{ owner_name }} remembers it, or skip this for now.</div>{% endif %}
 <h1>{{ person.name if person else "Add a person" }}</h1>
 {% if face_photos %}
 <a class="card" href="/people/{{ person.id }}/faces" style="text-decoration: none; color: inherit">
@@ -20,24 +20,37 @@
     {% with prefix = "birth" %}{% include "_date_fields.html" %}{% endwith %}
   </fieldset>
   <fieldset>
-    <legend>Anniversaries <span class="muted small" style="font-weight: 400">(optional)</span></legend>
+    <legend>Special dates <span class="muted small" style="font-weight: 400">(optional)</span></legend>
     <input type="hidden" name="ann_count" value="{{ values.ann_count }}">
     {% for i in range(values.ann_count) %}
     {% set prefix = "ann_" ~ i %}
-    <div class="card">
+    <div class="card special">
       <div class="field{% if errors[prefix ~ '_kind'] %} has-error{% endif %}">
-        <label for="{{ prefix }}_kind">Kind</label>
+        <label for="{{ prefix }}_kind">What is it?</label>
         <select id="{{ prefix }}_kind" name="{{ prefix }}_kind">
-          {% for key, label in ANNIVERSARY_TYPES.items() %}<option value="{{ key }}"{% if values[prefix ~ '_kind'] == key %} selected{% endif %}>{{ label }}</option>{% endfor %}
+          {% for key, label in SPECIAL_DATE_TYPES.items() %}<option value="{{ key }}"{% if values[prefix ~ '_kind'] == key %} selected{% endif %}>{{ label }}</option>{% endfor %}
         </select>
         {% if errors[prefix ~ '_kind'] %}<div class="error">{{ errors[prefix ~ '_kind'] }}</div>{% endif %}
       </div>
+      {# Shown for "Something else"; browsers too old for :has() always show it. #}
+      <div class="field other-label{% if errors[prefix ~ '_label'] %} has-error{% endif %}">
+        <label for="{{ prefix }}_label">What do you call it? <span class="muted small" style="font-weight: 400">(for Something else)</span></label>
+        <input id="{{ prefix }}_label" name="{{ prefix }}_label" value="{{ values[prefix ~ '_label'] }}" maxlength="40" autocomplete="off" placeholder="First day in the new house">
+        {% if errors[prefix ~ '_label'] %}<div class="error">{{ errors[prefix ~ '_label'] }}</div>{% endif %}
+      </div>
       {% include "_date_fields.html" %}
-      {% if values[prefix ~ '_month'] and not loop.last %}<label class="check"><input type="checkbox" name="{{ prefix }}_remove" value="1"{% if values[prefix ~ '_remove'] %} checked{% endif %}> Remove this anniversary</label>{% endif %}
+      {% if values[prefix ~ '_month'] and not loop.last %}<label class="check"><input type="checkbox" name="{{ prefix }}_remove" value="1"{% if values[prefix ~ '_remove'] %} checked{% endif %}> Remove this date</label>{% endif %}
     </div>
     {% endfor %}
     <p class="muted small">To add another, save first.</p>
   </fieldset>
+  {% if can_remember %}
+  <fieldset>
+    <legend>Remembering</legend>
+    <label class="check"><input type="checkbox" name="remembered" value="1"{% if values.remembered %} checked{% endif %}> We're remembering {{ person.name if person else "them" }}</label>
+    <p class="muted small">For someone who has died. Their birthday shows quietly on the day, with no gift, card or call reminders, and their photos still show.</p>
+  </fieldset>
+  {% endif %}
   <button class="btn" type="submit">Save</button>
 </form>
 {% if welcome %}<a class="btn quiet" href="/">I'll add it later</a>{% else %}<a class="btn quiet" href="/people">Cancel</a>{% endif %}

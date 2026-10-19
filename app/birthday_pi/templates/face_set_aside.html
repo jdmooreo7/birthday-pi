@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Set aside{% endblock %}
+{% block content %}
+<div class="top">
+  <a href="/faces">Back</a>
+</div>
+<div>
+  <h1>Set aside</h1>
+  <p class="muted">You said these aren't family, or aren't people. They're never asked about. Changed your mind? Name them.</p>
+</div>
+{% for g in groups %}
+<form class="card" method="post" action="/faces/{{ g.id }}/unignore">
+  <div class="set-aside-row">
+    <span class="face-strip">{% for f in strips[g.id] %}<img src="/face-files/{{ f }}.jpg" alt="">{% endfor %}</span>
+    <span class="grow"><span class="name">{{ labels[g.ignored] }}</span><span class="muted small">In {{ g.photos }} photos</span></span>
+  </div>
+  <button class="btn secondary" type="submit" name="then" value="who">Name them after all</button>
+</form>
+{% else %}
+<p class="muted">Nothing is set aside.</p>
+{% endfor %}
+<p class="muted small">New photos of someone set aside are kept with them here, so naming them later picks those up too.</p>
+{% endblock %}

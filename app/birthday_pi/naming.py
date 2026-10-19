@@ -8,7 +8,7 @@ worker places it elsewhere, never back in that group.
 import sqlite3
 
 OFFERED_AT = 3
-IGNORE_REASONS = {"not_family", "not_person"}
+IGNORE_REASONS = {"not_family": "Not family", "not_person": "Not a person"}
 
 # Approved photos only: faces in photos waiting for Grandma aren't offered until she approves them.
 _GROUPS = """
@@ -149,6 +149,17 @@ def forget_person(conn: sqlite3.Connection, person_id: int) -> list[int]:
 def ignore(conn: sqlite3.Connection, group_id: int, reason: str) -> None:
     if reason in IGNORE_REASONS:
         conn.execute("UPDATE face_groups SET ignored = ?, person_id = NULL WHERE id = ?", (reason, group_id))
+
+
+def set_aside(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    """Groups she set aside ("Not family", "Not a person"), biggest first, so she can name them after all.
+    New faces like theirs kept joining them, so naming one picks those up too."""
+    return conn.execute(_GROUPS.format(where="WHERE g.ignored IS NOT NULL")).fetchall()
+
+
+def unignore(conn: sqlite3.Connection, group_id: int) -> None:
+    """Undo, or "Name them after all": the group is asked about again."""
+    conn.execute("UPDATE face_groups SET ignored = NULL WHERE id = ?", (group_id,))
 
 
 def find_or_add_person(conn: sqlite3.Connection, typed: str) -> int:

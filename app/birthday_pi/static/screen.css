@@ -35,6 +35,19 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); o
 .empty { font-size: 3.7vh; color: var(--muted); }
 .status { display: flex; justify-content: space-between; align-items: center; padding: 2.6vh 3.7vh;
   background: var(--card); border-radius: 2.2vh; font-size: 3.5vh; color: var(--muted); min-height: 4vh; }
+/* Remembering someone today: quiet, with no button and no countdown. */
+.remember-card { display: flex; flex-direction: column; gap: 1.5vh; padding: 4.4vh 4.8vh; background: var(--card);
+  border: 0.3vh solid var(--avatar); border-radius: 2.6vh; }
+.remember-card .today { display: flex; align-items: center; gap: 1.7vh; font-size: 3.1vh; color: #c9c2e0; }
+.remember-card .today svg, .remember-strip svg { width: 4.1vh; height: 4.1vh; flex-shrink: 0; color: #c9c2e0; }
+.remember-card .who { font-size: 7vh; font-weight: 700; line-height: 1.1; }
+.remember-card .also { font-size: 3.5vh; color: var(--muted); }
+.remember-strip { flex: none; display: flex; align-items: center; gap: 2.2vh; padding: 2.8vh 3.7vh; background: var(--card);
+  border: 0.3vh solid var(--avatar); border-radius: 2.2vh; }
+.remember-strip .also { font-size: 4.1vh; color: #c9c2e0; }
+.remember-strip .who { font-size: 4.8vh; font-weight: 700; }
+/* Only on a phone held upright: a Home button and the slideshow's current photo. */
+.phone-home, .phone-photo { display: none; }
 /* Night dim: 85% dark from 10pm to 5am while idle; any input lifts it. */
 #night { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity 3s ease; }
 body.night #night { opacity: var(--night-dim, 0.85); }  /* Grandma's choice, set by screen.js */
@@ -118,7 +131,7 @@ body.photos #photos { opacity: 1; }
   .join-text .url { font-size: 5.5vw; overflow-wrap: anywhere; }
   .footnote { font-size: 4vw; }
   .home { padding: 6vw 5vw; gap: 7vw; }
-  .home-main { grid-template-columns: minmax(0, 1fr); gap: 8vw; }
+  .home-main { flex: none; grid-template-columns: minmax(0, 1fr); gap: 8vw; }
   .clock-col { gap: 1vw; }
   #clock { font-size: 24vw; }
   #date { font-size: 6vw; }
@@ -133,6 +146,18 @@ body.photos #photos { opacity: 1; }
   .empty { font-size: 5vw; }
   .status { flex-direction: column; align-items: flex-start; gap: 3vw; padding: 4vw; border-radius: 3vw; font-size: 4.2vw; min-height: 0; }
   .status a.look, .next a.look { display: inline-block; font-size: 4.4vw; padding: 2.5vw 4.5vw; }
+  .phone-home { display: inline-flex; align-items: center; gap: 2vw; margin: 4vw 5vw 0; min-height: 12vw; padding: 0 4vw 0 3vw;
+    border: 0.5vw solid var(--fg); border-radius: 999px; color: var(--fg); text-decoration: none; font-size: 4.6vw; font-weight: 700; }
+  .phone-photo.has { display: block; height: 56vw; border-radius: 4vw; background: var(--card) center / cover no-repeat; }
+  .phone-url { display: none; }
+  .remember-card { gap: 1.5vw; padding: 5vw; border-width: 0.5vw; border-radius: 4vw; }
+  .remember-card .today { gap: 2vw; font-size: 4.2vw; }
+  .remember-card .today svg, .remember-strip svg { width: 5.5vw; height: 5.5vw; }
+  .remember-card .who { font-size: 7.5vw; }
+  .remember-card .also { font-size: 4.4vw; }
+  .remember-strip { flex-wrap: wrap; gap: 1vw 2.5vw; padding: 4vw; border-width: 0.5vw; border-radius: 3vw; }
+  .remember-strip .also { font-size: 4.2vw; }
+  .remember-strip .who { font-size: 5vw; }
   .reminders { padding: 5vw; gap: 4vw; }
   .small-date { font-size: 4.5vw; }
   .reminders #clock { font-size: 6vw; }

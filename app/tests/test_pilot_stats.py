@@ -25,7 +25,7 @@ def test_pilot_stats_counts_without_names(tmp_path, monkeypatch):
     assert "median 14.0, longest 14.0" in out
     assert "Reminders showing now: 1" in out
     assert "Reminders that ended without Got it: 2" in out  # Rosa's card, Leo's gift
-    assert "waiting for Grandma's OK: 0" in out
+    assert "waiting for an OK: 0" in out
     assert "Rosa" not in out and "Leo" not in out
 
 

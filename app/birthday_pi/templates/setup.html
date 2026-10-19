@@ -2,16 +2,17 @@
 {% block title %}Set up {{ product }}{% endblock %}
 {% block content %}
 <h1>Welcome to {{ product }}</h1>
-<p>{{ product }} reminds Grandma of the family's birthdays and anniversaries, and shows family photos on her screen.</p>
+<p>{{ product }} keeps the family's birthdays and special dates in front of one person, and shows family photos on their screen.</p>
 <form method="post" action="/setup" novalidate>
   <div class="field{% if errors.owner_name %} has-error{% endif %}">
-    <label for="owner_name">What does the family call her?</label>
-    <input id="owner_name" name="owner_name" value="{{ owner_name }}" maxlength="40" autocomplete="off" required>
+    <label for="owner_name">Who is this for?</label>
+    <div id="owner_hint" class="muted small">Type the name the family uses, like Grandma, Nana, Dad or Maria.</div>
+    <input id="owner_name" name="owner_name" value="{{ owner_name }}" maxlength="40" autocomplete="off" placeholder="Their name" aria-describedby="owner_hint" required>
     {% if errors.owner_name %}<div class="error">{{ errors.owner_name }}</div>{% endif %}
   </div>
-  <div class="notice">{{ owner_name or "Grandma" }} now picks a 4-digit PIN. It lets her approve photos, and only she should know it.</div>
+  <div class="notice">Now the person it's for picks a 4-digit PIN. It's for saying yes to photos, so only they should know it.</div>
   <div class="field{% if errors.pin %} has-error{% endif %}">
-    <label for="pin">Her PIN</label>
+    <label for="pin">Their PIN</label>
     <input id="pin" name="pin" class="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="new-password" required>
     {% if errors.pin %}<div class="error">{{ errors.pin }}</div>{% endif %}
   </div>

@@ -10,6 +10,8 @@
   <p class="muted">Nobody is in {{ offered_at }} or more photos yet. Add photos and {{ product }} will find the faces in them.</p>
   {% endif %}
 </div>
+{% if undo %}<form id="undo" method="post" action="/faces/{{ undo.group.id }}/unignore"></form>{% endif %}
+{% include "_undo_strip.html" %}
 {% if not running %}<div class="notice">The face finder isn't running, so new photos aren't being looked at. On the Pi, run <code>docker compose up -d</code>.</div>{% endif %}
 {% if offered %}
 <div class="progress" role="group" aria-label="Naming progress">
@@ -39,6 +41,9 @@
     {% for p in named %}<a class="chip" href="/people/{{ p.id }}"><span class="avatar">{{ p.name[:1] | upper }}</span><span><b>{{ p.name }}</b> · {{ p.photos }}</span></a>{% endfor %}
   </div>
 </section>
+{% endif %}
+{% if set_aside %}
+<a class="set-aside-link" href="/faces/set-aside"><span><b>Set aside</b> <span class="muted">· {{ set_aside }} {{ "group" if set_aside == 1 else "groups" }}</span></span><span class="go">See them</span></a>
 {% endif %}
 <p class="muted small">People in fewer than {{ offered_at }} photos aren't asked about. You can still tag anyone on a photo. Looked at {{ counts.scanned }} of {{ counts.photos }} photos so far.</p>
 <a class="btn quiet" href="/">Home</a>

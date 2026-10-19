@@ -82,8 +82,55 @@ def test_not_family_is_never_asked_again(set_up):
     _family_photos(conn)
     mia, leo = _group_of(conn, 0), _group_of(conn, 1)
     r = client.post(f"/faces/{mia}", data={"action": "not_family"}, follow_redirects=False)
-    assert r.headers["location"] == f"/faces/{leo}"  # straight on to the next person
+    assert r.headers["location"] == f"/faces/{leo}?set_aside={mia}"  # straight on to the next person
     assert [g["id"] for g in naming.to_name(conn)] == [leo]
+
+
+def test_not_family_can_be_undone_straight_away(set_up):
+    client, conn = set_up, db.connect()
+    _family_photos(conn)
+    mia, leo = _group_of(conn, 0), _group_of(conn, 1)
+    assert "Not sure? You can change this later." in client.get(f"/faces/{mia}").text
+    r = client.post(f"/faces/{mia}", data={"action": "not_family"}, follow_redirects=False)
+    next_page = client.get(r.headers["location"]).text
+    assert "Set aside: not family" in next_page and f'action="/faces/{mia}/unignore"' in next_page
+    assert "Set aside: not family" not in client.get(f"/faces/{leo}").text  # gone with her next tap
+    r = client.post(f"/faces/{mia}/unignore", follow_redirects=False)
+    assert r.headers["location"] == f"/faces/{mia}"  # back to the group as it was
+    assert {g["id"] for g in naming.to_name(conn)} == {mia, leo}
+
+
+def test_set_aside_groups_can_be_named_after_all(set_up):
+    client, conn = set_up, db.connect()
+    _family_photos(conn)
+    mia, leo = _group_of(conn, 0), _group_of(conn, 1)
+    assert 'href="/faces/set-aside"' not in client.get("/faces").text
+    client.post(f"/faces/{mia}", data={"action": "not_family"})
+    r = client.post(f"/faces/{leo}", data={"action": "not_person"}, follow_redirects=False)
+    assert r.headers["location"] == f"/faces?set_aside={leo}"  # nobody left to ask about
+    listing = client.get(r.headers["location"]).text
+    assert "Set aside: not a person" in listing and 'href="/faces/set-aside"' in listing and "2 groups" in listing
+    page = client.get("/faces/set-aside").text
+    assert page.index("Not family") < page.index("Not a person")  # biggest first
+    assert "In 4 photos" in page and page.count("Name them after all") == 2
+    r = client.post(f"/faces/{mia}/unignore", data={"then": "who"}, follow_redirects=False)
+    assert r.headers["location"] == f"/faces/{mia}/who"
+    client.post(f"/faces/{mia}/who", data={"new_name": "Mia"})
+    assert naming.group(conn, mia)["ignored"] is None and naming.group(conn, mia)["name"] == "Mia"
+    assert "1 group" in client.get("/faces").text
+
+
+def test_set_aside_is_grandma_only(set_up):
+    client, conn = set_up, db.connect()
+    _family_photos(conn)
+    mia = _group_of(conn, 0)
+    client.post(f"/faces/{mia}", data={"action": "not_family"})
+    client.cookies.clear()
+    client.post("/who", data={"new_name": "Dana"})
+    assert client.get("/faces/set-aside", follow_redirects=False).headers["location"] == "/pin"
+    for data in ({}, {"then": "who"}):
+        assert client.post(f"/faces/{mia}/unignore", data=data, follow_redirects=False).headers["location"] == "/pin"
+    assert naming.group(conn, mia)["ignored"] == "not_family"
 
 
 def test_taken_out_faces_find_another_group(set_up):

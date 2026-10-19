@@ -20,11 +20,14 @@
     {% endfor %}
   </div>
   <p class="muted small center">All {{ faces | length }} faces shown. Faces you take out are asked about separately.</p>
+  {% include "_undo_strip.html" %}
   <button class="btn" type="submit" name="action" value="who">Who is this?</button>
   <div class="row3">
     <button class="btn secondary small-btn" type="submit" name="action" value="not_family">Not family</button>
     <button class="btn secondary small-btn" type="submit" name="action" value="not_person">Not a person</button>
     <a class="btn secondary small-btn" href="{{ '/faces/' ~ skip_to if skip_to else '/faces' }}">Skip</a>
   </div>
+  <p class="muted small center">Not sure? You can change this later.</p>
 </form>
+{% if undo %}<form id="undo" method="post" action="/faces/{{ undo.group.id }}/unignore"></form>{% endif %}
 {% endblock %}

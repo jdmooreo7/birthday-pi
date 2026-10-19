@@ -86,6 +86,14 @@ input:focus, select:focus, .btn:focus-visible, .choice:focus-visible, a:focus-vi
 .face-strip img { width: 44px; height: 44px; margin-right: -10px; border-radius: 50%; border: 2px solid var(--card);
   object-fit: cover; background: var(--line); }
 .face-strip.big img { width: 56px; height: 56px; margin-right: -12px; border-color: var(--bg); }
+.undo-strip { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 14px; border-radius: 14px;
+  background: var(--ink); color: #fff; }
+.undo-strip .face-strip img { border-color: var(--ink); }
+.undo-strip .btn { width: auto; min-height: 44px; padding: 0 18px; font-size: 17px; background: #fff; border-color: #fff; color: var(--ink); }
+.set-aside-link { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px;
+  padding: 0 14px; border: 2px dashed var(--line); border-radius: 14px; color: var(--ink); font-weight: 400; text-decoration: none; }
+.set-aside-link .go { color: var(--accent); font-weight: 700; }
+.set-aside-row { display: flex; align-items: center; gap: 12px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .chip { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px 0 6px; background: var(--card);
   border: 2px solid var(--line); border-radius: 999px; font-size: 16px; font-weight: 400; color: var(--ink); text-decoration: none; }
@@ -158,3 +166,13 @@ fieldset:disabled label, fieldset:disabled button { cursor: default; opacity: 0.
 .home-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 16px 0 12px;
   border: 2px solid var(--ink); border-radius: 999px; color: var(--ink); text-decoration: none; font-size: 18px; }
 .home-btn:hover { background: var(--ink); color: #fff; }
+/* Special dates: "What do you call it?" only for Something else (where the browser supports :has). */
+.special:has(select option[value="other"]:not(:checked)) .other-label { display: none; }
+/* Remembering someone today: quiet, no button. */
+.card.remember { display: flex; flex-direction: column; gap: 2px; background: #efe9f5; border-color: #d9cfe6; }
+/* "See the screen" on her home: dark, like the screen itself. */
+.see-screen { display: flex; align-items: center; gap: 14px; min-height: 64px; padding: 8px 18px; box-sizing: border-box;
+  border-radius: 16px; background: #1d1b2f; color: #fdf6ec; text-decoration: none; }
+.see-screen:hover { color: #fdf6ec; background: #2a2742; }
+.see-screen > span { display: flex; flex-direction: column; gap: 2px; }
+.see-screen .small { color: #b9b3cc; font-weight: 400; }
