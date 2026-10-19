@@ -3,7 +3,7 @@
 {% block content %}
 <h1>{% if added %}{{ added | length }} photo{{ "" if added | length == 1 else "s" }} added{% else %}No new photos{% endif %}</h1>
 {% if added %}
-<p>{% if trusted_owner %}They're on the screen now.{% else %}They'll show on the screen after Grandma says OK.{% endif %}
+<p>{% if trusted_owner %}They're on the screen now.{% else %}They'll show on the screen after {{ owner_name }} says OK.{% endif %}
   Tap a photo to say who's in it. On someone's birthday, the screen shows only their photos.</p>
 <div class="thumbs">
   {% for ph in added %}<a href="/photos/{{ ph.id }}"><img src="/photo-files/{{ ph.id }}-thumb.jpg" alt="New photo {{ loop.index }}"></a>{% endfor %}

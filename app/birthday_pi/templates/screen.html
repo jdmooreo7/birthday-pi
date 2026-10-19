@@ -3,11 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{ product }}</title>
+<title>{{ product }} screen</title>
 <link rel="stylesheet" href="{{ static_url('fonts.css') }}">
 <link rel="stylesheet" href="{{ static_url('screen.css') }}">
+<link rel="apple-touch-icon" href="{{ static_url('icon-180.png') }}">
+<link rel="icon" type="image/png" href="{{ static_url('icon-180.png') }}">
+<meta name="apple-mobile-web-app-title" content="{{ product }} screen">
 </head>
 <body data-build="{{ build }}" data-idle="{{ idle }}" data-night="{{ night }}">
+<a class="phone-home" href="/"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg>Home</a>
 <div id="content">{% include "_screen_content.html" %}</div>
 <div id="photos"><img alt=""><img alt=""><div id="photo-bar"><div id="photo-title"></div><div id="photo-clock"></div></div></div>
 <div id="night"></div>

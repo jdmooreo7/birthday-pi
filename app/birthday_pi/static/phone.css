@@ -158,3 +158,13 @@ fieldset:disabled label, fieldset:disabled button { cursor: default; opacity: 0.
 .home-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 16px 0 12px;
   border: 2px solid var(--ink); border-radius: 999px; color: var(--ink); text-decoration: none; font-size: 18px; }
 .home-btn:hover { background: var(--ink); color: #fff; }
+/* Special dates: "What do you call it?" only for Something else (where the browser supports :has). */
+.special:has(select option[value="other"]:not(:checked)) .other-label { display: none; }
+/* Remembering someone today: quiet, no button. */
+.card.remember { display: flex; flex-direction: column; gap: 2px; background: #efe9f5; border-color: #d9cfe6; }
+/* "See the screen" on her home: dark, like the screen itself. */
+.see-screen { display: flex; align-items: center; gap: 14px; min-height: 64px; padding: 8px 18px; box-sizing: border-box;
+  border-radius: 16px; background: #1d1b2f; color: #fdf6ec; text-decoration: none; }
+.see-screen:hover { color: #fdf6ec; background: #2a2742; }
+.see-screen > span { display: flex; flex-direction: column; gap: 2px; }
+.see-screen .small { color: #b9b3cc; font-weight: 400; }

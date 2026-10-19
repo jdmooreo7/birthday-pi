@@ -8,7 +8,7 @@
     <label for="photos">Photos</label>
     <input id="photos" name="photos" type="file" accept="image/*,.heic,.heif" multiple required>
   </div>
-  {% if not trusted_owner %}<div class="notice">These photos show on the screen after Grandma says OK.</div>{% endif %}
+  {% if not trusted_owner %}<div class="notice">These photos show on the screen after {{ owner_name }} says OK.</div>{% endif %}
   <button class="btn" type="submit">Add photos</button>
 </form>
 <p class="muted small">Photos stay on this Pi. Nothing is sent to the internet. Location and camera details are removed.</p>

@@ -57,6 +57,16 @@
     next.src = photoList[photoIdx];
   }
 
+  // On a phone held upright, the page shows the slideshow's photo in place (the monitor never loads it).
+  let phoneIdx = -1;
+  function phonePhoto(advance) {
+    const el = document.querySelector(".phone-photo");
+    if (!el || !photoList.length || !matchMedia("(orientation: portrait)").matches) return;
+    if (advance || phoneIdx < 0) phoneIdx = (phoneIdx + 1) % photoList.length;
+    el.style.backgroundImage = `url("${photoList[phoneIdx % photoList.length]}")`;
+    el.classList.add("has");
+  }
+
   async function loadPhotos() {
     try {
       const data = await (await fetch("/screen/photos", { cache: "no-store" })).json();
@@ -67,6 +77,7 @@
       photoIdx = -1;
       const title = document.getElementById("photo-title");
       title.textContent = celebrating;
+      phoneIdx = -1; phonePhoto(true);
     } catch (e) { /* keep the current photos */ }
   }
 
@@ -93,6 +104,7 @@
         const keys = reminderKeys();
         const isNew = [...keys].some(k => !seenReminders.has(k));
         seenReminders = keys;
+        phonePhoto(false);
         if (isNew) wake(); else tick();
       }
     } catch (e) { /* keep showing the last known screen */ }
@@ -103,4 +115,5 @@
   setInterval(refresh, REFRESH_MS);
   loadPhotos();
   setInterval(loadPhotos, 60 * 1000);
+  setInterval(() => phonePhoto(true), PHOTO_MS);
 })();

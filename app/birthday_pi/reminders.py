@@ -35,7 +35,7 @@ class Reminder:
     size_px: int  # before fitting to the stack
 
 
-def _possessive(name: str) -> str:
+def possessive(name: str) -> str:
     return f"{name}'" if name.endswith("s") else f"{name}'s"
 
 
@@ -58,9 +58,9 @@ def _reminder(c: Celebration, stage) -> Reminder:
     name, start, label, start_px = stage
     day = start - c.days_away + 1
     if name == "call":
-        headline = f"It's {_possessive(c.name)} {c.event}"
+        headline = f"It's {possessive(c.name)} {c.event}"
     else:
-        headline = f"{_possessive(c.name)} {c.event} is {how_far(c.days_away)}"
+        headline = f"{possessive(c.name)} {c.event} is {how_far(c.days_away)}"
     sub = f"{c.when.strftime('%A, %B')} {c.when.day}" + (f" · {c.extra}" if c.extra else "")
     if c.days_away == 0:
         sub = "Today" + (f" · {c.extra}" if c.extra else "")

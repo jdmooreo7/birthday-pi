@@ -168,8 +168,8 @@ def set_tags(conn: sqlite3.Connection, photo_id: str, person_ids: set[int]) -> N
 
 def slideshow(conn: sqlite3.Connection, today: date) -> dict:
     """Photos on the screen: on someone's day only photos with them in, otherwise every approved photo."""
-    celebrating = upcoming(conn, today, within_days=0)
-    names = [c.name for c in celebrating]
+    # Someone remembered today counts too: their photos show, under a quiet title.
+    celebrating = upcoming(conn, today, within_days=0, quiet=True)
     ids = [pid for c in celebrating for pid in c.person_ids]
     shown = "status = 'approved' AND hidden = 0"
     rows = []
@@ -186,8 +186,11 @@ def slideshow(conn: sqlite3.Connection, today: date) -> dict:
     if not rows:
         rows = conn.execute(f"SELECT id FROM photos WHERE {shown}").fetchall()
     title = ""
-    if celebrating:
-        kinds = {c.event for c in celebrating}
-        who = " & ".join(dict.fromkeys(names))
+    happy = [c for c in celebrating if not c.quiet]
+    if happy:
+        kinds = {c.event for c in happy}
+        who = " & ".join(dict.fromkeys(c.name for c in happy))
         title = f"Happy {kinds.pop()}, {who}!" if len(kinds) == 1 else f"Celebrating {who} today!"
+    elif celebrating:
+        title = "Remembering " + " & ".join(dict.fromkeys(c.name for c in celebrating))
     return {"photos": [f"/photo-files/{r['id']}.jpg" for r in rows], "title": title}

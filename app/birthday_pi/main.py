@@ -17,7 +17,9 @@ from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 
 from . import PRODUCT, db, devices, naming, photos, pins, reminders
-from .dates import ANNIVERSARY_TYPES, MONTHS, how_far, missing_birthdays, short_date, upcoming, valid_month_day
+from .dates import (MONTHS, SPECIAL_DATE_TYPES, how_far, missing_birthdays, remembering_today, short_date,
+                    special_date_label, upcoming, valid_month_day)
+from .reminders import possessive
 
 HERE = Path(__file__).parent
 COMING_UP_DAYS = 60  # "Coming up" lists only celebrations this many days ahead
@@ -40,6 +42,7 @@ def static_url(name: str) -> str:
 
 templates.env.globals.update(MONTHS=MONTHS, how_far=how_far, short_date=short_date, static_url=static_url,
                              product=PRODUCT)
+templates.env.filters["possessive"] = possessive  # "Nana's", "James'"
 
 
 class RedirectTo(Exception):
@@ -89,6 +92,9 @@ def page(request: Request, name: str, status_code: int = 200, **context) -> HTML
             context["pretend"] = db.get_setting(conn, "pretend_date") and today(conn)
             idle = idle_seconds(conn)
             context["test_idle"] = IDLE_CHOICES[idle] if idle != NORMAL_IDLE else None
+            # Whoever it's for, by the name the family gave at setup (no "Grandma" default).
+            owner = db.owner(conn)
+            context.setdefault("owner_name", owner["name"] if owner else "")
         finally:
             conn.close()
     return templates.TemplateResponse(request, name, context, status_code=status_code)
@@ -105,7 +111,7 @@ def healthz() -> dict:
 def setup_form(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
     if db.is_set_up(conn):
         return RedirectResponse("/", status_code=303)
-    return page(request, "setup.html", owner_name="Grandma", errors={})
+    return page(request, "setup.html", owner_name="", errors={})
 
 
 @app.post("/setup")
@@ -117,7 +123,7 @@ async def setup_save(request: Request, conn: sqlite3.Connection = Depends(get_co
     pin, pin2 = str(form.get("pin", "")), str(form.get("pin2", ""))
     errors = {}
     if not owner_name:
-        errors["owner_name"] = "Please type what the family calls her."
+        errors["owner_name"] = "Please type the name the family uses."
     elif len(owner_name) > 40:
         errors["owner_name"] = "Please use 40 letters or fewer."
     if not pins.is_valid(pin):
@@ -134,10 +140,15 @@ async def setup_save(request: Request, conn: sqlite3.Connection = Depends(get_co
 
 # ---------- Who's using this phone? ----------
 
+def _who_people(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    """Who can be picked as using a phone: not someone the family is remembering."""
+    return conn.execute("SELECT * FROM people WHERE remembered = 0 ORDER BY is_owner DESC, name").fetchall()
+
+
 @app.get("/who")
 def who_form(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
     require_setup(conn)
-    people = conn.execute("SELECT * FROM people ORDER BY is_owner DESC, name").fetchall()
+    people = _who_people(conn)
     return page(request, "who.html", people=people, device=devices.current(conn, request), error=None)
 
 
@@ -148,7 +159,7 @@ async def who_save(request: Request, conn: sqlite3.Connection = Depends(get_conn
     new_name = str(form.get("new_name", "")).strip()
     if new_name:
         if len(new_name) > 40:
-            people = conn.execute("SELECT * FROM people ORDER BY is_owner DESC, name").fetchall()
+            people = _who_people(conn)
             return page(request, "who.html", 400, people=people, device=None, error="Please use 40 letters or fewer.")
         cur = conn.execute("INSERT INTO people (name) VALUES (?)", (new_name,))
         response = RedirectResponse(f"/people/{cur.lastrowid}?welcome=1", status_code=303)
@@ -158,7 +169,7 @@ async def who_save(request: Request, conn: sqlite3.Connection = Depends(get_conn
         person = conn.execute("SELECT * FROM people WHERE id = ?", (int(form.get("person_id", "")),)).fetchone()
     except ValueError:
         person = None
-    if person is None:
+    if person is None or person["remembered"]:
         return RedirectResponse("/who", status_code=303)
     if person["is_owner"]:
         return RedirectResponse("/pin", status_code=303)
@@ -196,6 +207,7 @@ def home(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
     now = today(conn)
     return page(
         request, "home.html", device=device, today=now, reminders=reminders.active(conn, now),
+        remembering=remembering_today(conn, now),
         upcoming=upcoming(conn, now, within_days=COMING_UP_DAYS), missing=missing_birthdays(conn),
         people_count=people_count, trusted_owner=devices.is_trusted_owner(device),
         pending=photos.pending_count(conn),
@@ -366,15 +378,15 @@ async def pretend_save(request: Request, conn: sqlite3.Connection = Depends(get_
 
 
 def _people_list(conn: sqlite3.Connection) -> list[dict]:
-    anns: dict[int, list[str]] = {}
+    dates: dict[int, list[str]] = {}
     for a in conn.execute("SELECT * FROM anniversaries ORDER BY month, day"):
-        label = ANNIVERSARY_TYPES.get(a["kind"], a["kind"].title())
-        anns.setdefault(a["person_id"], []).append(f"{label} anniversary · {MONTHS[a['month'] - 1]} {a['day']}")
+        label = special_date_label(a["kind"], a["label"])
+        dates.setdefault(a["person_id"], []).append(f"{label} · {MONTHS[a['month'] - 1]} {a['day']}")
     result = []
     for p in conn.execute("SELECT * FROM people ORDER BY is_owner DESC, name"):
         birthday = f"{MONTHS[p['birth_month'] - 1]} {p['birth_day']}" if p["birth_month"] else None
-        result.append({"id": p["id"], "name": p["name"], "is_owner": p["is_owner"],
-                       "birthday": birthday, "anniversaries": anns.get(p["id"], [])})
+        result.append({"id": p["id"], "name": p["name"], "is_owner": p["is_owner"], "remembered": p["remembered"],
+                       "birthday": birthday, "special_dates": dates.get(p["id"], [])})
     return result
 
 
@@ -389,25 +401,27 @@ def _s(v) -> str:
 
 
 def _form_values(conn: sqlite3.Connection, person: sqlite3.Row | None) -> dict:
-    """Values for the person form. Anniversary rows are ann_<i>_kind/_month/_day/_year,
-    one per saved anniversary plus one blank row for adding another."""
-    values = {"name": "", "birth_month": "", "birth_day": "", "birth_year": ""}
+    """Values for the person form. Special date rows are ann_<i>_kind/_label/_month/_day/_year,
+    one per saved date plus one blank row for adding another."""
+    values = {"name": "", "birth_month": "", "birth_day": "", "birth_year": "",
+              "remembered": "1" if person is not None and person["remembered"] else ""}
     anns = []
     if person is not None:
         values.update(name=person["name"], birth_month=_s(person["birth_month"]),
                       birth_day=_s(person["birth_day"]), birth_year=_s(person["birth_year"]))
         anns = conn.execute("SELECT * FROM anniversaries WHERE person_id = ? ORDER BY id", (person["id"],)).fetchall()
     for i, a in enumerate(anns):
-        values.update({f"ann_{i}_kind": a["kind"], f"ann_{i}_month": _s(a["month"]),
+        values.update({f"ann_{i}_kind": a["kind"], f"ann_{i}_label": _s(a["label"]), f"ann_{i}_month": _s(a["month"]),
                        f"ann_{i}_day": _s(a["day"]), f"ann_{i}_year": _s(a["year"])})
     i = len(anns)
-    values.update({f"ann_{i}_kind": next(iter(ANNIVERSARY_TYPES)), f"ann_{i}_month": "", f"ann_{i}_day": "", f"ann_{i}_year": ""})
+    values.update({f"ann_{i}_kind": next(iter(SPECIAL_DATE_TYPES)), f"ann_{i}_label": "", f"ann_{i}_month": "",
+                   f"ann_{i}_day": "", f"ann_{i}_year": ""})
     values["ann_count"] = i + 1
     return values
 
 
 MAX_ANNIVERSARY_ROWS = 20
-FUTURE_YEARS = 10  # anniversaries may be dated up to this many years ahead
+FUTURE_YEARS = 10  # special dates may be dated up to this many years ahead
 
 
 def _parse_person_form(form) -> tuple[dict, dict, dict]:
@@ -416,9 +430,9 @@ def _parse_person_form(form) -> tuple[dict, dict, dict]:
         count = min(max(int(form.get("ann_count", "0")), 0), MAX_ANNIVERSARY_ROWS)
     except ValueError:
         count = 0
-    keys = ["name", "birth_month", "birth_day", "birth_year"]
+    keys = ["name", "birth_month", "birth_day", "birth_year", "remembered"]
     for i in range(count):
-        keys += [f"ann_{i}_kind", f"ann_{i}_month", f"ann_{i}_day", f"ann_{i}_year", f"ann_{i}_remove"]
+        keys += [f"ann_{i}_kind", f"ann_{i}_label", f"ann_{i}_month", f"ann_{i}_day", f"ann_{i}_year", f"ann_{i}_remove"]
     values = {k: str(form.get(k, "")).strip() for k in keys}
     errors: dict[str, str] = {}
     this_year = today().year
@@ -443,7 +457,7 @@ def _parse_person_form(form) -> tuple[dict, dict, dict]:
             errors[day_key] = "Please pick the month and day too."
         return month, day, year
 
-    clean: dict = {"name": values["name"], "anniversaries": []}
+    clean: dict = {"name": values["name"], "anniversaries": [], "remembered": bool(values["remembered"])}
     if not values["name"]:
         errors["name"] = "Please type a name."
     elif len(values["name"]) > 40:
@@ -457,15 +471,20 @@ def _parse_person_form(form) -> tuple[dict, dict, dict]:
         month, day, year = date_parts(prefix, this_year + FUTURE_YEARS)  # e.g. a graduation next year
         if month is None and day is None and year is None:
             continue  # a blank row, or one cleared to remove it
-        kind = values[f"{prefix}_kind"]
-        if kind not in ANNIVERSARY_TYPES:
-            errors[f"{prefix}_kind"] = "Please pick the kind of anniversary."
-        clean["anniversaries"].append((kind, month, day, year))
+        kind, label = values[f"{prefix}_kind"], values[f"{prefix}_label"]
+        if kind not in SPECIAL_DATE_TYPES:
+            errors[f"{prefix}_kind"] = "Please pick what it is."
+        if kind == "other" and not label:
+            errors[f"{prefix}_label"] = "Please type what you call it."
+        elif kind == "other" and len(label) > 40:
+            errors[f"{prefix}_label"] = "Please use 40 letters or fewer."
+        clean["anniversaries"].append((kind, month, day, year, label if kind == "other" else None))
     values["ann_count"] = count
     return values, clean, errors
 
 
-def _save_person(conn: sqlite3.Connection, person_id: int | None, c: dict) -> int:
+def _save_person(conn: sqlite3.Connection, person_id: int | None, c: dict, can_remember: bool = False) -> int:
+    """can_remember: the person it's for, on a trusted phone, may mark someone as remembered."""
     if person_id is None:
         person_id = conn.execute(
             "INSERT INTO people (name, birth_month, birth_day, birth_year) VALUES (?, ?, ?, ?)",
@@ -476,9 +495,11 @@ def _save_person(conn: sqlite3.Connection, person_id: int | None, c: dict) -> in
             "UPDATE people SET name = ?, birth_month = ?, birth_day = ?, birth_year = ? WHERE id = ?",
             (c["name"], c["birth_month"], c["birth_day"], c["birth_year"], person_id),
         )
+    if can_remember:
+        conn.execute("UPDATE people SET remembered = ? WHERE id = ? AND is_owner = 0", (int(c["remembered"]), person_id))
     conn.execute("DELETE FROM anniversaries WHERE person_id = ?", (person_id,))
     conn.executemany(
-        "INSERT INTO anniversaries (person_id, kind, month, day, year) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO anniversaries (person_id, kind, month, day, year, label) VALUES (?, ?, ?, ?, ?, ?)",
         [(person_id, *a) for a in c["anniversaries"]],
     )
     return person_id
@@ -489,7 +510,8 @@ def _person_page(request, conn, device, person, values, errors, status_code=200,
     face_photos = naming.photo_count(conn, person["id"]) if person and devices.is_trusted_owner(device) \
         and naming.person_faces(conn, person["id"]) else 0
     return page(request, "person_form.html", status_code, device=device, person=person, values=values,
-                errors=errors, welcome=welcome, this_year=today().year, ANNIVERSARY_TYPES=ANNIVERSARY_TYPES,
+                errors=errors, welcome=welcome, this_year=today().year, SPECIAL_DATE_TYPES=SPECIAL_DATE_TYPES,
+                can_remember=devices.is_trusted_owner(device) and not (person and person["is_owner"]),
                 face_photos=face_photos)
 
 
@@ -505,7 +527,7 @@ async def person_create(request: Request, conn: sqlite3.Connection = Depends(get
     values, clean, errors = _parse_person_form(await request.form())
     if errors:
         return _person_page(request, conn, device, None, values, errors, 400)
-    _save_person(conn, None, clean)
+    _save_person(conn, None, clean, can_remember=devices.is_trusted_owner(device))
     return RedirectResponse("/people", status_code=303)
 
 
@@ -531,7 +553,7 @@ async def person_update(person_id: int, request: Request, conn: sqlite3.Connecti
     values, clean, errors = _parse_person_form(await request.form())
     if errors:
         return _person_page(request, conn, device, person, values, errors, 400)
-    _save_person(conn, person_id, clean)
+    _save_person(conn, person_id, clean, can_remember=devices.is_trusted_owner(device))
     return RedirectResponse("/people", status_code=303)
 
 
@@ -572,7 +594,7 @@ def photo_list(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
         ]
     else:
         sections = [
-            ("Your photos waiting for Grandma", photos.listing(conn, "status = 'pending' AND uploader_id = ?",
+            (f"Your photos waiting for {db.owner(conn)['name']}", photos.listing(conn, "status = 'pending' AND uploader_id = ?",
                                                                (device["person_id"],))),
             ("On the screen", photos.listing(conn, "status = 'approved' AND hidden = 0")),
         ]
@@ -982,7 +1004,10 @@ def _screen_context(conn: sqlite3.Connection) -> dict:
     now = today(conn)
     active = reminders.active(conn, now)
     shown = list(zip(active, reminders.monitor_sizes(active)))
-    return {"mode": "home", "today": now, "upcoming": upcoming(conn, now, within_days=COMING_UP_DAYS, limit=4),
+    remembering = remembering_today(conn, now)
+    return {"mode": "home", "today": now, "remembering": remembering,
+            # A quiet card for someone remembered today takes the room of two "Coming up" rows.
+            "upcoming": upcoming(conn, now, within_days=COMING_UP_DAYS, limit=2 if remembering else 4),
             "missing_count": len(missing_birthdays(conn)), "now": datetime.now(), "pending": photos.pending_count(conn),
             "phone_url": PUBLIC_URL.split("://", 1)[-1], "reminders": shown,
             "more_reminders": len(active) - len(shown), "reminder_keys": " ".join(r.key for r in active),

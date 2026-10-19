@@ -7,7 +7,7 @@ from datetime import date, timedelta
 from . import PRODUCT, db, devices, pins
 
 USAGE = """\
-  reset-pin            Choose a new PIN for Grandma (asks twice). Her phones must enter it again.
+  reset-pin            Choose a new PIN for the person it's for (asks twice). Their phones must enter it again.
   load-sample [--pin]  Set up a fresh Pi with a sample family for testing (PIN 1234 unless given).
   pilot-stats [--days] Numbers for the weekly pilot check: reminders, photos, faces. No names or dates.
 """
@@ -125,7 +125,7 @@ def pilot_stats(conn, today: date, days: int = 7) -> list[str]:
         age = today - datetime.fromisoformat(pending[1]).replace(tzinfo=timezone.utc).astimezone().date()
         oldest = f" (oldest waiting {age.days} days)"
     added = conn.execute("SELECT COUNT(*) FROM photos WHERE created_at > ?", (since.isoformat(),)).fetchone()[0]
-    lines.append(f"Photos added: {added}; waiting for Grandma's OK: {pending[0]}{oldest}")
+    lines.append(f"Photos added: {added}; waiting for an OK: {pending[0]}{oldest}")
     lines.append(f"Faces waiting for \"Is this ...?\": {len(naming.asking(conn))}")
     lines.append(f"People in {PRODUCT}: {conn.execute('SELECT COUNT(*) FROM people').fetchone()[0]}")
     return lines
@@ -166,7 +166,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="birthday_pi.cli", description=f"{PRODUCT} commands",
                                      formatter_class=argparse.RawDescriptionHelpFormatter, epilog=USAGE)
     sub = parser.add_subparsers(dest="command", required=True)
-    p = sub.add_parser("reset-pin", help="choose a new PIN for Grandma")
+    p = sub.add_parser("reset-pin", help="choose a new PIN for the person it's for")
     p.add_argument("--pin", help=argparse.SUPPRESS)  # for scripts and tests
     p.set_defaults(func=reset_pin)
     p = sub.add_parser("load-sample", help="set up a fresh Pi with a sample family")
