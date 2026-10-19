@@ -11,7 +11,7 @@ M8 is the first time someone who isn't us uses Birthday Pi every day. A second P
 | 2 | Ask what phone she uses, and how old it is | PO | Model and system version known. Anything older than iOS 14.5 or Chrome 87 gets our "too old" message, and older Android phones may not open `birthdaypi.local` (then we use the Pi's address instead) |
 | 3 | Consent from the adults in her family, and parents for children | PO, with a one-page note from Security | Everyone has said OK before photos go in |
 | 4 | Buy the hardware (list under "The second Pi") | PO | Arrived |
-| 5 | Tag `v0.2.1` after a few days of our Pi running it cleanly | Tech Lead, SRE | Tag on `main` |
+| 5 | Tag `v0.2.1` after the before-pilot changes (step 10) are built and our Pi has run them cleanly for a few days | Tech Lead, SRE | Tag on `main` |
 | 6 | Install it at our house **using only the README**, timed, noting every snag | PO (Tech Lead watches) | Install report filed; README fixed |
 | 7 | 48-hour burn-in at our house with the sample family, then wipe it | SRE | 0 restarts; data wiped so she starts fresh |
 | 8 | Printed card by the screen, and the day-one script | Designer | Approved on the design canvas |
