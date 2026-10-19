@@ -16,7 +16,8 @@ M8 is the first time someone who isn't us uses Birthday Pi every day. A second P
 | 7 | 48-hour burn-in at our house with the sample family, then wipe it | SRE | 0 restarts; data wiped so she starts fresh |
 | 8 | Printed card by the screen, and the day-one script | Designer | Approved on the design canvas |
 | 9 | Pilot helpers: a numbers-only weekly check (`scripts/pilot-stats.sh`) and a safe data copy to the USB stick (`scripts/backup-data.sh`) | Tech Lead, SRE | Built and tested on our Pi 2026-10-15: the check matched the live counts, and a copy restored into a throwaway volume passed SQLite's integrity check with all 12 people, 228 photos and 223 faces |
-| 10 | Day one next door (see below) | Everyone | She's using it |
+| 10 | Before-pilot changes: no "Grandma" default (setup asks who it's for, and every page uses that name), the screen on a phone (its own icon and bookmark name, no code to scan, a "See the screen" button on her home), and anniversaries become **special dates** (wedding, graduation, remembering someone, or something she names) | Designer, Tech Lead | Approved on the design canvas, built, tested, on pi2 before day one |
+| 11 | Day one next door (see below) | Everyone | She's using it |
 
 ## Goal and pass (Product Manager)
 **What we want to learn:** does Grandma notice and act on reminders without being prompted, can she look after photos and faces herself, and does the Pi keep running without us?
