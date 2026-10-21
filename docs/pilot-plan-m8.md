@@ -7,9 +7,9 @@ M8 is the first time someone who isn't us uses Birthday Pi every day. A second P
 ## Prep checklist (before day one)
 | # | Step | Who | Done when |
 |---|---|---|---|
-| 1 | Pick the 3-week window with a real birthday or anniversary in it | PO | Dates agreed with her family |
+| 1 | Pick the 3-week window with a real birthday or anniversary in it | PO | Dates agreed with her family. **Done 2026-10-21:** from Saturday 2026-10-24, about 3 weeks to 2026-11-14, with a real birthday in it |
 | 2 | Ask what phone she uses, and how old it is | PO | Model and system version known. Anything older than iOS 14.5 or Chrome 87 gets our "too old" message, and older Android phones may not open `birthdaypi.local` (then we use the Pi's address instead). **Done 2026-10-21:** iPhone on iOS 27.0.1 |
-| 3 | Consent from the adults in her family, and parents for children | PO, with a one-page note from Security | Everyone has said OK before photos go in |
+| 3 | Consent from the adults in her family, and parents for children | PO, with a one-page note from Security | Everyone has said OK before photos go in. **2026-10-21:** her family, and parents for the children in her photos, have agreed; the one-page note (draft on the design canvas) is for them to keep and sign |
 | 4 | Buy the hardware (list under "The second Pi") | PO | Arrived |
 | 5 | Tag `v0.2.1` after the before-pilot changes (step 10) are built and our Pi has run them cleanly for a few days | Tech Lead, SRE | Tag on `main`. **Done 2026-10-21:** `v0.2.1` at `cf8faba` after 41 hours clean on our Pi; pi2 runs the tag |
 | 6 | Install it at our house **using only the README**, timed, noting every snag | PO (Tech Lead watches) | Install report filed; README fixed |
@@ -35,8 +35,10 @@ M8 is the first time someone who isn't us uses Birthday Pi every day. A second P
 **What we bring back** is a list of where people hesitated, ranked. That list becomes M9. We don't bring back names, dates or photos.
 
 ## Day one (Designer)
-- **A family member sets it up with her, not for her.** They scan the welcome QR, Grandma picks her PIN, and together they add 3–5 people. Then visitors upload a few photos from their phones and Grandma approves them. This is the real first-run flow.
-- **A printed card** stays by the screen with three things: what "Got it" means, how to approve a photo on her phone, and "if the screen is blank, unplug it for 10 seconds".
+- **A family member sets it up with her, not for her,** following the printed setup sheet. They scan the welcome QR, type what the family calls her under "Who is this for?", she picks her PIN, and together they add 3–5 people (special dates too, if she likes). Then visitors upload a few photos from their phones and she approves them. This is the real first-run flow.
+- **Not on day one (Designer, 2026-10-21):** marking someone as remembered. If the family wants it, they do it with her later, in their own time. If she taps "Not family" by mistake, the Undo strip or Set aside brings it back.
+- **Before we leave (SRE, 2026-10-21):** run `scripts/backup-data.sh` to the USB stick, which stays in her house, and pull the power to check it comes back to the screen by itself.
+- **The printed card** (approved 2026-10-16, five steps, the same as Help on her phone) stays by the screen, including "if the screen is blank, unplug it for 10 seconds".
 - **We watch without helping.** One of us takes notes and only steps in if she's stuck for more than a minute or gets upset.
 - **What we watch for:** can she read the reminder from her chair? Is the PIN a hurdle? Does she notice "N faces to check"? Does night dimming bother anyone? Does she use the monitor or her phone?
 - **Her phone is how she does things (PO, 2026-10-15).** The screen is for looking at: everything she does, from "Got it" to approving photos and checking faces, happens on her phone, which already clears the screen within seconds. On day one the family member adds Birthday Pi to her phone's home screen as an icon and makes sure the phone is trusted as Grandma.
