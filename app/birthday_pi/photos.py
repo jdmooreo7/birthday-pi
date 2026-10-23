@@ -143,6 +143,19 @@ def listing(conn: sqlite3.Connection, where: str, params: tuple = ()) -> list[sq
     ).fetchall()
 
 
+# On the screen with nobody in it named: not tagged by hand, no face Grandma named, and not "no one to name".
+UNNAMED = (
+    "status = 'approved' AND hidden = 0 AND no_one = 0"
+    " AND NOT EXISTS (SELECT 1 FROM photo_people pp WHERE pp.photo_id = ph.id)"
+    " AND NOT EXISTS (SELECT 1 FROM faces f JOIN face_groups g ON g.id = f.group_id"
+    " WHERE f.photo_id = ph.id AND g.person_id IS NOT NULL)"
+)
+
+
+def unnamed_ids(conn: sqlite3.Connection) -> list[str]:
+    return [r["id"] for r in listing(conn, UNNAMED)]
+
+
 def pending_count(conn: sqlite3.Connection) -> int:
     return conn.execute("SELECT COUNT(*) FROM photos WHERE status = 'pending'").fetchone()[0]
 

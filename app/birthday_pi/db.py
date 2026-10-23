@@ -47,7 +47,8 @@ CREATE TABLE IF NOT EXISTS photos (
     taken_at    TEXT,
     look        INTEGER,  -- 64-bit picture fingerprint (photos.look), to spot the same photo saved again
     created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    faces_scanned INTEGER NOT NULL DEFAULT 0  -- set by the faces worker
+    faces_scanned INTEGER NOT NULL DEFAULT 0,  -- set by the faces worker
+    no_one      INTEGER NOT NULL DEFAULT 0  -- Grandma said there's no one to name in it (a view, the dog)
 );
 -- Who's in each photo, tagged by hand.
 CREATE TABLE IF NOT EXISTS photo_people (
@@ -140,6 +141,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
             COMMIT;
         """)
     _add_column(conn, "anniversaries", "label", "TEXT")  # v0.2.1: the name of a special date of their own
+    _add_column(conn, "photos", "no_one", "INTEGER NOT NULL DEFAULT 0")  # v0.2.2
 
 
 def _add_column(conn: sqlite3.Connection, table: str, column: str, decl: str) -> bool:

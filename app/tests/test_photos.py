@@ -204,3 +204,50 @@ def test_deleting_photos_is_grandma_only(set_up):
     assert client.get(f"/photos/{pid}/delete", follow_redirects=False).headers["location"] == "/pin"
     assert client.post(f"/photos/{pid}/delete", follow_redirects=False).headers["location"] == "/pin"
     assert photos.get(db.connect(), pid) is not None
+
+
+def test_nobody_named_yet_one_by_one(set_up):
+    """Photos on the screen with nobody named: her phone lists them after "On the screen" and steps through them."""
+    client = set_up
+    upload(client, jpeg("red"), jpeg("blue"), jpeg("green"))
+    client.post("/people/new", data={"name": "Leo", "birth_month": "11", "birth_day": "4"})
+    conn = db.connect()
+    leo = conn.execute("SELECT id FROM people WHERE name = 'Leo'").fetchone()["id"]
+    ids = photos.unnamed_ids(conn)
+    assert len(ids) == 3
+    page = client.get("/photos").text
+    assert page.index("On the screen") < page.index("Nobody named yet") and "Name them one by one" in page
+
+    first = client.get(f"/photos/{ids[0]}?next=unnamed").text
+    assert "1 of 3" in first and "Save and next" in first and "No one to name" in first
+    assert f'href="/photos/{ids[1]}?next=unnamed">Skip for now' in first
+    # Naming someone takes it out of the list and moves on to the next one.
+    r = client.post(f"/photos/{ids[0]}/tags", data={"person": leo, "next": "unnamed"}, follow_redirects=False)
+    assert r.headers["location"] == f"/photos/{ids[1]}?next=unnamed"
+    # "No one to name" does too; a photo with nobody to name stays out of the list.
+    r = client.post(f"/photos/{ids[1]}/no-one", follow_redirects=False)
+    assert r.headers["location"] == f"/photos/{ids[2]}?next=unnamed"
+    r = client.post(f"/photos/{ids[2]}/no-one", follow_redirects=False)
+    assert r.headers["location"] == "/photos#unnamed"
+    assert photos.unnamed_ids(conn) == []
+    assert "Everyone's named" in client.get("/photos").text
+
+
+def test_nobody_named_yet_is_grandma_only(set_up):
+    client = set_up
+    upload(client, jpeg("red"))
+    photo = photos.unnamed_ids(db.connect())[0]
+    as_visitor(client)
+    page = client.get("/photos").text
+    assert "Nobody named yet" not in page and "Everyone's named" not in page
+    assert "Save and next" not in client.get(f"/photos/{photo}?next=unnamed").text
+    client.post(f"/photos/{photo}/no-one")
+    assert photos.unnamed_ids(db.connect()) == [photo]
+
+
+def test_on_the_screen_shows_the_newest_then_see_all(set_up):
+    client = set_up
+    upload(client, *[jpeg((i * 15, 80, 120), size=(300 + i, 200)) for i in range(17)])
+    page = client.get("/photos").text
+    assert "See all 17" in page
+    assert "See all" not in client.get("/photos?all=1").text

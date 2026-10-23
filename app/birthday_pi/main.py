@@ -582,24 +582,27 @@ def person_remove(person_id: int, request: Request, conn: sqlite3.Connection = D
 
 # ---------- Photos (phone) ----------
 
+SCREEN_SHOWN = 15  # newest photos under "On the screen" before "See all" (five rows of three)
+
+
 @app.get("/photos")
 def photo_list(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
     device = require_device(conn, request)
     trusted = devices.is_trusted_owner(device)
+    on_screen = photos.listing(conn, "status = 'approved' AND hidden = 0")
+    show_all = request.query_params.get("all") == "1"
+    shown = on_screen if show_all else on_screen[:SCREEN_SHOWN]
     if trusted:
-        sections = [
-            ("Waiting for your OK", photos.listing(conn, "status = 'pending'")),
-            ("On the screen", photos.listing(conn, "status = 'approved' AND hidden = 0")),
-            ("Hidden", photos.listing(conn, "status = 'approved' AND hidden = 1")),
-        ]
+        before = [("Waiting for your OK", photos.listing(conn, "status = 'pending'"))]
+        after = [("Hidden", photos.listing(conn, "status = 'approved' AND hidden = 1"))]
+        unnamed = photos.listing(conn, photos.UNNAMED)
     else:
-        sections = [
-            (f"Your photos waiting for {db.owner(conn)['name']}", photos.listing(conn, "status = 'pending' AND uploader_id = ?",
-                                                               (device["person_id"],))),
-            ("On the screen", photos.listing(conn, "status = 'approved' AND hidden = 0")),
-        ]
-    return page(request, "photos.html", device=device, sections=sections, trusted_owner=trusted,
-                pending=photos.pending_count(conn), deleted=request.query_params.get("deleted") == "1")
+        before = [(f"Your photos waiting for {db.owner(conn)['name']}", photos.listing(conn, "status = 'pending' AND uploader_id = ?",
+                                                                (device["person_id"],)))]
+        after, unnamed = [], None
+    return page(request, "photos.html", device=device, before=before, after=after, on_screen=on_screen, shown=shown,
+                unnamed=unnamed, trusted_owner=trusted, pending=photos.pending_count(conn),
+                deleted=request.query_params.get("deleted") == "1")
 
 
 @app.get("/photos/add")
@@ -655,6 +658,27 @@ def _get_photo(conn: sqlite3.Connection, photo_id: str) -> sqlite3.Row:
     return photo
 
 
+def _stepping(conn: sqlite3.Connection, device: sqlite3.Row, photo_id: str, request_or_form) -> dict | None:
+    """Naming photos one by one from "Nobody named yet" (her trusted phone only): where this photo is in the
+    list and which one comes after it."""
+    if request_or_form.get("next") != "unnamed" or not devices.is_trusted_owner(device):
+        return None
+    ids = photos.unnamed_ids(conn)
+    if photo_id not in ids:
+        return {"ids": ids, "index": None, "after": ids[0] if ids else None}
+    i = ids.index(photo_id)
+    return {"ids": ids, "index": i, "total": len(ids), "after": ids[i + 1] if i + 1 < len(ids) else None}
+
+
+def _next_unnamed(conn: sqlite3.Connection, step: dict) -> str:
+    """After saving or "no one to name", this photo leaves the list, so the next one is at the same place."""
+    ids = photos.unnamed_ids(conn)
+    i = step["index"] if step["index"] is not None else 0
+    if i < len(ids):
+        return f"/photos/{ids[i]}?next=unnamed"
+    return f"/photos/{ids[0]}?next=unnamed" if ids else "/photos#unnamed"
+
+
 @app.get("/photos/{photo_id}")
 def photo_detail(photo_id: str, request: Request, conn: sqlite3.Connection = Depends(get_conn)):
     device = require_device(conn, request)
@@ -663,14 +687,16 @@ def photo_detail(photo_id: str, request: Request, conn: sqlite3.Connection = Dep
     return page(request, "photo_detail.html", device=device, photo=photo, people=people,
                 tagged=photos.tags(conn, photo_id), trusted_owner=devices.is_trusted_owner(device),
                 recognised=photos.face_names(conn, photo_id),
+                step=_stepping(conn, device, photo_id, request.query_params),
                 saved=request.query_params.get("saved") == "1")
 
 
 @app.post("/photos/{photo_id}/tags")
 async def photo_tags(photo_id: str, request: Request, conn: sqlite3.Connection = Depends(get_conn)):
-    require_device(conn, request)
+    device = require_device(conn, request)
     _get_photo(conn, photo_id)
     form = await request.form()
+    step = _stepping(conn, device, photo_id, form)
     ids = set()
     for v in form.getlist("person"):
         try:
@@ -678,7 +704,20 @@ async def photo_tags(photo_id: str, request: Request, conn: sqlite3.Connection =
         except ValueError:
             pass
     photos.set_tags(conn, photo_id, ids)
+    if step:
+        return RedirectResponse(_next_unnamed(conn, step), status_code=303)
     return RedirectResponse(f"/photos/{photo_id}?saved=1", status_code=303)
+
+
+@app.post("/photos/{photo_id}/no-one")
+async def photo_no_one(photo_id: str, request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    """"No one to name": a view, the dog, someone from behind. It leaves "Nobody named yet"; tagging someone
+    on it later still works."""
+    device = require_trusted_owner(conn, request)
+    _get_photo(conn, photo_id)
+    step = _stepping(conn, device, photo_id, {"next": "unnamed"})
+    conn.execute("UPDATE photos SET no_one = 1 WHERE id = ?", (photo_id,))
+    return RedirectResponse(_next_unnamed(conn, step), status_code=303)
 
 
 def _decide(conn: sqlite3.Connection, photo_id: str, action: str) -> None:

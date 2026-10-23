@@ -66,6 +66,10 @@ input:focus, select:focus, .btn:focus-visible, .choice:focus-visible, a:focus-vi
 .thumbs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
 .thumbs a, .thumbs span { display: block; aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: var(--line); }
 .thumbs img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.unnamed { background: var(--card); border: 2px solid var(--accent); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.notice.done { background: #e4f1e8; }
+.step-count { margin: 0; }
+.row2 form .btn { width: 100%; }
 .photo { width: 100%; height: auto; border-radius: 14px; display: block; background: var(--line); }
 .checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .check { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 12px; margin: 0;
