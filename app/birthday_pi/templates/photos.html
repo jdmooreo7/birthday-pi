@@ -1,5 +1,14 @@
 {% extends "base.html" %}
 {% block title %}Photos{% endblock %}
+{% macro thumbs(items, next="") %}
+  {% if items %}
+  <div class="thumbs">
+    {% for ph in items %}<a href="/photos/{{ ph.id }}{{ next }}"><img src="/photo-files/{{ ph.id }}-thumb.jpg" alt="Photo added by {{ ph.uploader or 'someone' }}" loading="lazy"></a>{% endfor %}
+  </div>
+  {% else %}
+  <p class="muted small">None.</p>
+  {% endif %}
+{% endmacro %}
 {% block content %}
 <h1>Photos</h1>
 {% if deleted %}<div class="notice" role="status">Photo deleted.</div>{% endif %}
@@ -7,16 +16,34 @@
   <a class="btn" href="/photos/add">Add photos</a>
   {% if trusted_owner and pending %}<a class="btn secondary" href="/photos/review">Review {{ pending }}</a>{% else %}<a class="btn secondary" href="/">Home</a>{% endif %}
 </div>
-{% for title, items in sections %}
+{% for title, items in before %}
 <section class="list" aria-label="{{ title }}">
   <h2>{{ title }} <span class="muted small" style="font-weight: 400">· {{ items | length }}</span></h2>
-  {% if items %}
-  <div class="thumbs">
-    {% for ph in items %}<a href="/photos/{{ ph.id }}"><img src="/photo-files/{{ ph.id }}-thumb.jpg" alt="Photo added by {{ ph.uploader or 'someone' }}" loading="lazy"></a>{% endfor %}
-  </div>
-  {% else %}
-  <p class="muted small">None.</p>
-  {% endif %}
+  {{ thumbs(items) }}
+</section>
+{% endfor %}
+<section class="list" aria-label="On the screen">
+  <h2>On the screen <span class="muted small" style="font-weight: 400">· {{ on_screen | length }}</span></h2>
+  {{ thumbs(shown) }}
+  {% if on_screen | length > shown | length %}<a class="btn quiet" href="/photos?all=1">See all {{ on_screen | length }}</a>{% endif %}
+</section>
+{% if unnamed %}
+<section class="list unnamed" id="unnamed" aria-labelledby="unnamed-h">
+  <h2 id="unnamed-h">Nobody named yet <span class="muted small" style="font-weight: 400">· {{ unnamed | length }}</span></h2>
+  <p class="muted small">Say who's in them, so they show on the right birthdays.</p>
+  {{ thumbs(unnamed, "?next=unnamed") }}
+  <a class="btn" href="/photos/{{ unnamed[0].id }}?next=unnamed">Name them one by one</a>
+</section>
+{% elif unnamed is not none and on_screen %}
+<div class="notice done" id="unnamed" role="status"><b>Everyone's named.</b> New photos with nobody named will show up here.</div>
+{% endif %}
+{% if trusted_owner %}
+<a class="set-aside-link" href="/faces"><span><b>Who's in your photos?</b> <span class="muted">· {{ named }} named</span></span><span class="go">See them</span></a>
+{% endif %}
+{% for title, items in after %}
+<section class="list" aria-label="{{ title }}">
+  <h2>{{ title }} <span class="muted small" style="font-weight: 400">· {{ items | length }}</span></h2>
+  {{ thumbs(items) }}
 </section>
 {% endfor %}
 {% endblock %}

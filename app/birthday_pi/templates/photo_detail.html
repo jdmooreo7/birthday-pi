@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Photo{% endblock %}
 {% block content %}
+{% if step and step.index is not none %}<p class="step-count"><b>Nobody named yet</b> <span class="muted">· {{ step.index + 1 }} of {{ step.total }}</span></p>{% endif %}
 <img class="photo" src="/photo-files/{{ photo.id }}.jpg" alt="Photo added by {{ photo.uploader or 'someone' }}">
 <p class="muted small">Added by {{ photo.uploader or "someone" }}{% if photo.status == "pending" %} · waiting for {{ owner_name | possessive }} OK{% elif photo.hidden %} · hidden from the screen{% endif %}</p>
 {% if trusted_owner %}
@@ -21,6 +22,7 @@
 {% endif %}
 {% if recognised %}<p class="small"><span class="name">Found by face:</span> {{ recognised | join(", ") }}</p>{% endif %}
 <form method="post" action="/photos/{{ photo.id }}/tags">
+  {% if step %}<input type="hidden" name="next" value="unnamed">{% endif %}
   <fieldset>
     <legend>Who's in this photo?</legend>
     {% if saved %}<div class="notice" role="status">Saved.</div>{% endif %}
@@ -30,8 +32,16 @@
       {% endfor %}
     </div>
   </fieldset>
-  <button class="btn secondary" type="submit">Save who's in it</button>
+  {% if step %}<a class="btn quiet" href="/people/new">Someone else? Add a person</a>
+  <button class="btn" type="submit">Save and next</button>
+  {% else %}<button class="btn secondary" type="submit">Save who's in it</button>{% endif %}
 </form>
+{% if step %}
+<div class="row2">
+  <a class="btn secondary" href="{{ '/photos/' ~ step.after ~ '?next=unnamed' if step.after else '/photos#unnamed' }}">Skip for now</a>
+  <form method="post" action="/photos/{{ photo.id }}/no-one"><button class="btn secondary" type="submit">No one to name</button></form>
+</div>
+{% endif %}
 <a class="btn quiet" href="/photos">All photos</a>
 {% if trusted_owner and photo.status != "pending" %}<a class="btn quiet" href="/photos/{{ photo.id }}/delete">Delete from {{ product }}</a>{% endif %}
 {% endblock %}
