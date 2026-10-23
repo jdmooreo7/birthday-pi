@@ -216,7 +216,8 @@ def test_nobody_named_yet_one_by_one(set_up):
     ids = photos.unnamed_ids(conn)
     assert len(ids) == 3
     page = client.get("/photos").text
-    assert page.index("On the screen") < page.index("Nobody named yet") and "Name them one by one" in page
+    assert page.index("On the screen") < page.index("Nobody named yet") < page.index("Who's in your photos?")
+    assert "Name them one by one" in page and "Who's in your photos?" not in client.get("/settings/date").text
 
     first = client.get(f"/photos/{ids[0]}?next=unnamed").text
     assert "1 of 3" in first and "Save and next" in first and "No one to name" in first
@@ -239,7 +240,7 @@ def test_nobody_named_yet_is_grandma_only(set_up):
     photo = photos.unnamed_ids(db.connect())[0]
     as_visitor(client)
     page = client.get("/photos").text
-    assert "Nobody named yet" not in page and "Everyone's named" not in page
+    assert "Nobody named yet" not in page and "Everyone's named" not in page and "Who's in your photos?" not in page
     assert "Save and next" not in client.get(f"/photos/{photo}?next=unnamed").text
     client.post(f"/photos/{photo}/no-one")
     assert photos.unnamed_ids(db.connect()) == [photo]

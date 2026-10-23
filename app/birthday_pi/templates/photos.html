@@ -37,6 +37,9 @@
 {% elif unnamed is not none and on_screen %}
 <div class="notice done" id="unnamed" role="status"><b>Everyone's named.</b> New photos with nobody named will show up here.</div>
 {% endif %}
+{% if trusted_owner %}
+<a class="set-aside-link" href="/faces"><span><b>Who's in your photos?</b> <span class="muted">· {{ named }} named</span></span><span class="go">See them</span></a>
+{% endif %}
 {% for title, items in after %}
 <section class="list" aria-label="{{ title }}">
   <h2>{{ title }} <span class="muted small" style="font-weight: 400">· {{ items | length }}</span></h2>

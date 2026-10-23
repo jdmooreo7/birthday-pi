@@ -596,12 +596,13 @@ def photo_list(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
         before = [("Waiting for your OK", photos.listing(conn, "status = 'pending'"))]
         after = [("Hidden", photos.listing(conn, "status = 'approved' AND hidden = 1"))]
         unnamed = photos.listing(conn, photos.UNNAMED)
+        named = len(naming.named_people(conn))
     else:
         before = [(f"Your photos waiting for {db.owner(conn)['name']}", photos.listing(conn, "status = 'pending' AND uploader_id = ?",
                                                                 (device["person_id"],)))]
-        after, unnamed = [], None
+        after, unnamed, named = [], None, None
     return page(request, "photos.html", device=device, before=before, after=after, on_screen=on_screen, shown=shown,
-                unnamed=unnamed, trusted_owner=trusted, pending=photos.pending_count(conn),
+                unnamed=unnamed, named=named, trusted_owner=trusted, pending=photos.pending_count(conn),
                 deleted=request.query_params.get("deleted") == "1")
 
 
