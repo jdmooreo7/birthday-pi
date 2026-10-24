@@ -15,6 +15,12 @@ COPY birthday_pi ./birthday_pi
 RUN useradd --uid 1000 --create-home app && mkdir /data && chown app /data
 USER app
 
+# The version and build date shown on Settings and Help; scripts/update.sh passes them in. Last, so a new
+# date only rebuilds this layer.
+ARG BIRTHDAY_PI_VERSION=""
+ARG BIRTHDAY_PI_BUILT=""
+ENV BIRTHDAY_PI_VERSION=${BIRTHDAY_PI_VERSION} BIRTHDAY_PI_BUILT=${BIRTHDAY_PI_BUILT}
+
 EXPOSE 8080
 # After 3 failed checks in a row, selfcheck stops the app so Docker restarts it.
 HEALTHCHECK --interval=60s --timeout=40s --start-period=30s \

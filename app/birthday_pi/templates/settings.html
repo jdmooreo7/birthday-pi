@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<div>
+  <h1>Settings</h1>
+  <p class="muted">Only you can change these.</p>
+</div>
+{% if saved %}<div class="notice" role="status">Saved.</div>{% endif %}
+<a class="setting-row" href="/settings/night">
+  <span class="grow"><span class="name">Screen at night</span>
+  <span class="muted small">{% if night.on %}Dims {{ hour_label(night.start) }} to {{ hour_label(night.end) }}{% else %}Off: the screen stays bright{% endif %}</span></span>
+  <span class="go" aria-hidden="true">›</span>
+</a>
+<form method="post" action="/settings" class="card">
+  <label class="name" for="wait">Photos start on the screen after</label>
+  <select id="wait" name="wait">
+    {% for seconds, label in WAIT_CHOICES.items() %}<option value="{{ seconds }}"{% if seconds == wait %} selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+  <span class="muted small">How long the screen waits, with nobody using it, before the slideshow.</span>
+  <button class="btn secondary" type="submit">Save</button>
+</form>
+<a class="setting-row" href="/settings/helper?back=settings">
+  <span class="grow"><span class="name">Who to call</span>
+  <span class="muted small">{% if helper %}{{ helper.name }} · on the Help page{% else %}Not set yet{% endif %}</span></span>
+  <span class="go" aria-hidden="true">›</span>
+</a>
+{% if testing %}
+<a class="setting-row testing" href="/settings/date">
+  <span class="grow"><span class="label">For whoever set it up</span><span class="name">Testing: pretend today is</span>
+  <span class="muted small">Shown because testing is switched on for this Pi.</span></span>
+  <span class="go" aria-hidden="true">›</span>
+</a>
+{% endif %}
+<p class="version">{{ version }}</p>
+{% endblock %}

@@ -10,7 +10,11 @@ cd "$(dirname "$0")/.." || exit 1
 profile=""
 [ -n "$(docker compose --profile observe ps -q netdata 2>/dev/null)" ] && profile="--profile observe"
 
-up() { docker compose $profile up -d --build; }
+# The version and build date the app shows on Settings and Help.
+up() {
+  BIRTHDAY_PI_VERSION=$(git describe --tags --always) BIRTHDAY_PI_BUILT=$(date +%F) \
+    docker compose $profile up -d --build
+}
 
 healthy() {  # wait up to 3 minutes for the app and the face worker to report healthy
   i=0

@@ -24,6 +24,25 @@ from .reminders import possessive
 HERE = Path(__file__).parent
 COMING_UP_DAYS = 60  # "Coming up" lists only celebrations this many days ahead
 PUBLIC_URL = os.environ.get("BIRTHDAY_PI_URL", "http://birthdaypi.local:8080").rstrip("/")
+# The running version and build date, passed in by scripts/update.sh. A hand-made build has neither.
+VERSION = os.environ.get("BIRTHDAY_PI_VERSION", "").strip()
+BUILT = os.environ.get("BIRTHDAY_PI_BUILT", "").strip()
+
+
+def testing_on() -> bool:
+    """"Pretend today is" and short waits only work on a Pi with BIRTHDAY_PI_TESTING=1 in its .env."""
+    return os.environ.get("BIRTHDAY_PI_TESTING", "") == "1"
+
+
+def version_line() -> str:
+    """"Birthday Pi v0.2.3 · updated Oct 23", shown at the bottom of Settings and Help."""
+    if not VERSION:
+        return f"{PRODUCT} (unknown build)"
+    try:
+        built = date.fromisoformat(BUILT)
+        return f"{PRODUCT} {VERSION} · updated {built.strftime('%b')} {built.day}"
+    except ValueError:
+        return f"{PRODUCT} {VERSION}"
 
 # The container's filesystem is read-only; uploads are buffered in TMPDIR on the data volume (see compose.yaml).
 if os.environ.get("TMPDIR"):
@@ -64,8 +83,8 @@ def get_conn():
 
 
 def today(conn: sqlite3.Connection | None = None) -> date:
-    """The real date, or the "pretend today is" date set for testing."""
-    if conn is not None:
+    """The real date, or the "pretend today is" date set for testing (only while testing is on)."""
+    if conn is not None and testing_on():
         pretend = db.get_setting(conn, "pretend_date")
         if pretend:
             return date.fromisoformat(pretend)
@@ -89,9 +108,9 @@ def page(request: Request, name: str, status_code: int = 200, **context) -> HTML
     if "pretend" not in context:
         conn = db.connect()
         try:
-            context["pretend"] = db.get_setting(conn, "pretend_date") and today(conn)
-            idle = idle_seconds(conn)
-            context["test_idle"] = IDLE_CHOICES[idle] if idle != NORMAL_IDLE else None
+            context["pretend"] = testing_on() and db.get_setting(conn, "pretend_date") and today(conn)
+            test_idle = _test_idle(conn)
+            context["test_idle"] = IDLE_CHOICES[test_idle] if test_idle else None
             # Whoever it's for, by the name the family gave at setup (no "Grandma" default).
             owner = db.owner(conn)
             context.setdefault("owner_name", owner["name"] if owner else "")
@@ -241,20 +260,48 @@ def require_trusted_owner(conn: sqlite3.Connection, request: Request) -> sqlite3
     return device
 
 
-# How long the monitor waits without input before photos start. Normal is 5 minutes;
-# shorter waits are for testing and show the testing banner.
-IDLE_CHOICES = {10: "10 seconds", 30: "30 seconds", 60: "1 minute", 300: "5 minutes (normal)"}
+# How long the monitor waits without input before photos start. She picks it in Settings (5 minutes unless
+# she changes it). The short testing waits show the testing banner, and only work while testing is on.
+WAIT_CHOICES = {60: "1 minute", 300: "5 minutes", 900: "15 minutes", 1800: "30 minutes"}
 NORMAL_IDLE = 300
+IDLE_CHOICES = {10: "10 seconds", 30: "30 seconds", 60: "1 minute", NORMAL_IDLE: "Her setting (in Settings)"}
+
+
+def _test_idle(conn: sqlite3.Connection) -> int | None:
+    value = int(db.get_setting(conn, "test_idle_seconds", "0"))
+    return value if testing_on() and value in IDLE_CHOICES and value != NORMAL_IDLE else None
 
 
 def idle_seconds(conn: sqlite3.Connection) -> int:
-    value = int(db.get_setting(conn, "test_idle_seconds", str(NORMAL_IDLE)))
-    return value if value in IDLE_CHOICES else NORMAL_IDLE
+    value = int(db.get_setting(conn, "idle_seconds", str(NORMAL_IDLE)))
+    return _test_idle(conn) or (value if value in WAIT_CHOICES else NORMAL_IDLE)
 
 
 def _testing_page(request, conn, device, status_code=200, error=None):
     return page(request, "pretend_date.html", status_code, device=device, real=date.today(), current=today(conn),
-                error=error, idle=idle_seconds(conn), IDLE_CHOICES=IDLE_CHOICES)
+                error=error, idle=_test_idle(conn) or NORMAL_IDLE, IDLE_CHOICES=IDLE_CHOICES)
+
+
+@app.get("/settings")
+def settings_page(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    """Her settings (trusted phone only): screen at night, the wait before photos, who to call, the version."""
+    device = require_trusted_owner(conn, request)
+    return page(request, "settings.html", device=device, night=night(conn), helper=helper(conn),
+                wait=int(db.get_setting(conn, "idle_seconds", str(NORMAL_IDLE))), WAIT_CHOICES=WAIT_CHOICES,
+                testing=testing_on(), version=version_line(), saved=request.query_params.get("saved") == "1")
+
+
+@app.post("/settings")
+async def settings_save(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
+    require_trusted_owner(conn, request)
+    form = await request.form()
+    try:
+        wait = int(str(form.get("wait", NORMAL_IDLE)))
+    except ValueError:
+        wait = NORMAL_IDLE
+    if wait in WAIT_CHOICES:
+        db.set_setting(conn, "idle_seconds", str(wait))
+    return RedirectResponse("/settings?saved=1", status_code=303)
 
 
 # ---------- Screen at night (Grandma's choice) and Help ----------
@@ -326,13 +373,14 @@ def helper(conn: sqlite3.Connection) -> dict | None:
 def help_page(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
     device = devices.current(conn, request)
     return page(request, "help.html", device=device, night=night(conn), helper=helper(conn),
-                trusted_owner=devices.is_trusted_owner(device))
+                trusted_owner=devices.is_trusted_owner(device), version=version_line())
 
 
 @app.get("/settings/helper")
 def helper_form(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
     device = require_trusted_owner(conn, request)
-    return page(request, "helper.html", device=device, helper=helper(conn) or {"name": "", "phone": ""})
+    back = "/settings" if request.query_params.get("back") == "settings" else "/help"
+    return page(request, "helper.html", device=device, helper=helper(conn) or {"name": "", "phone": ""}, back=back)
 
 
 @app.post("/settings/helper")
@@ -345,18 +393,22 @@ async def helper_save(request: Request, conn: sqlite3.Connection = Depends(get_c
         db.set_setting(conn, "helper_phone", phone)
     else:
         conn.execute("DELETE FROM settings WHERE key IN ('helper_name', 'helper_phone')")
-    return RedirectResponse("/help", status_code=303)
+    return RedirectResponse("/settings" if form.get("back") == "/settings" else "/help", status_code=303)
 
 
 @app.get("/settings/date")
 def pretend_form(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
     device = require_trusted_owner(conn, request)
+    if not testing_on():
+        raise RedirectTo("/settings")
     return _testing_page(request, conn, device)
 
 
 @app.post("/settings/date")
 async def pretend_save(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
     device = require_trusted_owner(conn, request)
+    if not testing_on():
+        raise RedirectTo("/settings")
     form = await request.form()
     if form.get("action") == "normal":
         conn.execute("DELETE FROM settings WHERE key IN ('pretend_date', 'test_idle_seconds')")

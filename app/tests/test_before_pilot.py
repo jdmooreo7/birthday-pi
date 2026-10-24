@@ -18,7 +18,9 @@ def nana(client):
     return client
 
 
-def pretend(day: date):
+def pretend(monkeypatch, day: date):
+    """A pretend date, which only counts while testing is switched on."""
+    monkeypatch.setenv("BIRTHDAY_PI_TESTING", "1")
     db.set_setting(db.connect(), "pretend_date", day.isoformat())
 
 
@@ -150,7 +152,7 @@ def test_only_she_can_mark_someone_as_remembered(set_up):
     assert db.connect().execute("SELECT remembered FROM people WHERE id = ?", (leo,)).fetchone()[0] == 0  # ignored
 
 
-def test_a_remembered_birthday_is_quiet(set_up):
+def test_a_remembered_birthday_is_quiet(set_up, monkeypatch):
     add(set_up, name="Ray", birth_month="3", birth_day="3", birth_year="1956", remembered="1")
     add(set_up, name="Leo", birth_month="3", birth_day="20")
     add(set_up, name="Sam", remembered="1")  # no birthday: never nagged for one
@@ -164,21 +166,21 @@ def test_a_remembered_birthday_is_quiet(set_up):
     [c] = remembering_today(conn, date(2026, 3, 3))
     assert c.name == "Ray" and c.extra == "would have been 70"
     assert slideshow(conn, date(2026, 3, 3))["title"] == "Remembering Ray"
-    pretend(date(2026, 3, 3))
+    pretend(monkeypatch, date(2026, 3, 3))
     home = set_up.get("/").text
     assert "Remembering Ray" in home and "Would have been 70" in home and "Got it" not in home
     screen = set_up.get("/screen/content").text
     assert 'class="remember-card"' in screen and "Remembering Ray" in screen and "Got it" not in screen
 
 
-def test_birthday_and_remembering_on_the_same_day(set_up):
+def test_birthday_and_remembering_on_the_same_day(set_up, monkeypatch):
     add(set_up, name="Mia", birth_month="3", birth_day="3", birth_year="2019")
     add(set_up, name="Ray", ann_0_kind="remembering", ann_0_month="3", ann_0_day="3", ann_0_year="2021")
     conn = db.connect()
     assert [c.name for c in upcoming(conn, date(2026, 2, 1))] == ["Mia"]  # no countdown to a remembrance
     assert [r.headline for r in active(conn, date(2026, 3, 3))] == ["It's Mia's birthday"]
     assert slideshow(conn, date(2026, 3, 3))["title"] == "Happy birthday, Mia!"
-    pretend(date(2026, 3, 3))
+    pretend(monkeypatch, date(2026, 3, 3))
     screen = set_up.get("/screen/content").text
     assert "It&#39;s Mia&#39;s birthday" in screen and "Got it" in screen  # the birthday stays the main card
     strip = screen.split('class="remember-strip"')[1]

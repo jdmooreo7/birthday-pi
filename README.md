@@ -113,6 +113,7 @@ Check it worked: `docker compose exec app printenv BIRTHDAY_PI_URL`.
 - Use the form `http://<name-or-address>:<port>`, with no `/` at the end.
 - If you changed the port in `compose.yaml`, use that port here too.
 - If a phone can't open the `.local` address (some Android phones can't), use the Pi's IP address instead, for example `BIRTHDAY_PI_URL=http://192.168.1.50:8080`. Reserve that address for the Pi in your router's settings (often called a "DHCP reservation") so it doesn't change.
+- **For whoever looks after the Pi:** adding `BIRTHDAY_PI_TESTING=1` on its own line in `.env`, then `docker compose up -d`, puts a "Testing: pretend today is" page at the bottom of Settings, for trying reminders without waiting. Leave it out on a Pi someone lives with.
 
 ## Step 3: See it
 
