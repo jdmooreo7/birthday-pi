@@ -113,7 +113,30 @@ Check it worked: `docker compose exec app printenv BIRTHDAY_PI_URL`.
 - Use the form `http://<name-or-address>:<port>`, with no `/` at the end.
 - If you changed the port in `compose.yaml`, use that port here too.
 - If a phone can't open the `.local` address (some Android phones can't), use the Pi's IP address instead, for example `BIRTHDAY_PI_URL=http://192.168.1.50:8080`. Reserve that address for the Pi in your router's settings (often called a "DHCP reservation") so it doesn't change.
-- **For whoever looks after the Pi:** adding `BIRTHDAY_PI_TESTING=1` on its own line in `.env`, then `docker compose up -d`, puts a "Testing: pretend today is" page at the bottom of Settings, for trying reminders without waiting. Leave it out on a Pi someone lives with.
+
+### Optional: testing mode, for whoever looks after the Pi
+
+Testing mode adds a "Testing: pretend today is" page at the bottom of Settings, for trying reminders and the slideshow without waiting days. It's off unless you turn it on. Leave it off on a Pi someone lives with: a pretend date shows the wrong birthdays.
+
+Turn it on:
+
+```sh
+cd ~/birthday-pi
+echo "BIRTHDAY_PI_TESTING=1" >> .env
+docker compose up -d
+```
+
+Use `>>`, not `>`, so the rest of `.env` stays. Then, on the owner's phone, open Settings: the testing page is at the bottom. A black "Testing" banner shows on every page while a pretend date or a short wait is on.
+
+Turn it off:
+
+```sh
+cd ~/birthday-pi
+sed -i '/^BIRTHDAY_PI_TESTING=/d' .env
+docker compose up -d
+```
+
+The page goes away, and any pretend date or short wait left over is ignored. Check which way it is: `docker compose exec app printenv BIRTHDAY_PI_TESTING` prints `1` when it's on, and nothing when it's off.
 
 ## Step 3: See it
 
