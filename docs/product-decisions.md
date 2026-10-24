@@ -99,3 +99,4 @@ Decisions made by the Product Owner, newest last. The storyboard (`birthday_pi_s
 
 ## 2026-10-24: Settings link on every page
 PO: the Settings link should stay under her name on every phone page she browses, not only home. Done for the trusted owner phone on every page except Settings itself; other phones still never see it. Ships in the next update after the PR is merged.
+| 2026-10-24 | v0.2.3 deployed to our Pi (healthy), with testing left off so the PO sees what a family sees; the README explains turning testing on and off. The first run of the new `update.sh` didn't pass the version, because the script updated itself mid-run; a rebuild took 19 seconds. Later runs pass it. |
