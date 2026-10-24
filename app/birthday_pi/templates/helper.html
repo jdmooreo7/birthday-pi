@@ -6,9 +6,10 @@
   <p class="muted">Shown on the Help page as a button to call when something isn't working. Leave both empty to take it off.</p>
 </div>
 <form method="post" action="/settings/helper">
+  <input type="hidden" name="back" value="{{ back }}">
   <div class="field"><label for="name">Name</label><input id="name" name="name" value="{{ helper.name }}" autocomplete="off"></div>
   <div class="field"><label for="phone">Phone number</label><input id="phone" name="phone" type="tel" value="{{ helper.phone }}" autocomplete="off"></div>
   <button class="btn" type="submit">Save</button>
 </form>
-<a class="btn quiet" href="/help">Back</a>
+<a class="btn quiet" href="{{ back }}">Back</a>
 {% endblock %}

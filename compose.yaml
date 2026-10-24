@@ -13,13 +13,19 @@ x-hardened: &hardened
 services:
   app:
     <<: *hardened
-    build: ./app
+    build:
+      context: ./app
+      args:
+        BIRTHDAY_PI_VERSION: ${BIRTHDAY_PI_VERSION:-}
+        BIRTHDAY_PI_BUILT: ${BIRTHDAY_PI_BUILT:-}
     image: birthday-pi:local
     ports:
       - "8080:8080"
     environment:
       # The address phones use to reach this Pi (shown as a QR code on the monitor).
       BIRTHDAY_PI_URL: ${BIRTHDAY_PI_URL:-http://birthdaypi.local:8080}
+      # 1 turns on "pretend today is" and short waits, for whoever looks after the Pi. Off unless set in .env.
+      BIRTHDAY_PI_TESTING: ${BIRTHDAY_PI_TESTING:-}
       # Large photo uploads are buffered here (on the SD card), not in memory.
       TMPDIR: /data/tmp
     volumes:

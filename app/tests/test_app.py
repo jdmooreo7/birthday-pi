@@ -203,7 +203,8 @@ def test_got_it_on_monitor_clears_phone_too(set_up):
     assert "Got it" not in client.get("/screen/content").text
 
 
-def test_pretend_date_needs_grandma_and_shows_banner(client):
+def test_pretend_date_needs_grandma_and_shows_banner(client, monkeypatch):
+    monkeypatch.setenv("BIRTHDAY_PI_TESTING", "1")
     client.post("/setup", data={"owner_name": "Grandma", "pin": "2468", "pin2": "2468"})
     client.post("/who", data={"new_name": "Dana"})
     assert client.get("/settings/date", follow_redirects=False).headers["location"] == "/pin"
@@ -221,7 +222,8 @@ def test_screen_reports_its_build_so_it_can_reload(client):
     assert f'data-build="{build}"' in client.get("/screen").text
 
 
-def test_testing_wait_before_photos(set_up):
+def test_testing_wait_before_photos(set_up, monkeypatch):
+    monkeypatch.setenv("BIRTHDAY_PI_TESTING", "1")
     client = set_up
     assert client.get("/screen/content").headers["X-Screen-Idle"] == "300"
     client.post("/settings/date", data={"date": date.today().isoformat(), "idle": "10", "action": "save"})
@@ -246,3 +248,47 @@ def test_the_product_name_comes_from_one_place(client, monkeypatch):
     monkeypatch.setitem(main.templates.env.globals, "product", "Family Screen")
     page = client.get("/setup").text
     assert "Welcome to Family Screen" in page and "Birthday Pi" not in page
+
+
+def test_settings_under_her_name(set_up):
+    """Settings is a small link under her name on her home page; her phone only."""
+    client = set_up
+    home = client.get("/").text
+    assert 'href="/settings">Settings' in home and "Testing: date" not in home and ">Screen at night<" not in home
+    page = client.get("/settings").text
+    assert "Screen at night" in page and "Photos start on the screen after" in page and "Who to call" in page
+    assert "Birthday Pi (unknown build)" in page  # no version passed in by update.sh in tests
+    client.post("/settings", data={"wait": "900"})
+    assert client.get("/screen/content").headers["X-Screen-Idle"] == "900"
+    client.post("/settings", data={"wait": "7"})  # not a choice: ignored
+    assert client.get("/screen/content").headers["X-Screen-Idle"] == "900"
+    r = client.post("/settings/helper", data={"name": "Sam", "phone": "555 0142", "back": "/settings"}, follow_redirects=False)
+    assert r.headers["location"] == "/settings" and "Sam · on the Help page" in client.get("/settings").text
+    client.cookies.clear()
+    client.post("/who", data={"new_name": "Dana"})
+    assert 'href="/settings">Settings' not in client.get("/").text
+    assert client.get("/settings", follow_redirects=False).headers["location"] == "/pin"
+    assert "Birthday Pi (unknown build)" in client.get("/help").text  # any phone sees the version on Help
+
+
+def test_testing_is_off_unless_switched_on(set_up, monkeypatch):
+    client = set_up
+    assert "Testing: pretend today is" not in client.get("/settings").text
+    assert client.get("/settings/date", follow_redirects=False).headers["location"] == "/settings"
+    later = date.today() + timedelta(days=200)
+    client.post("/settings/date", data={"date": later.isoformat(), "idle": "10", "action": "save"})
+    assert "pretending" not in client.get("/").text
+    # A pretend date left over from when testing was on is ignored once it's off.
+    monkeypatch.setenv("BIRTHDAY_PI_TESTING", "1")
+    client.post("/settings/date", data={"date": later.isoformat(), "idle": "10", "action": "save"})
+    assert "pretending" in client.get("/").text and "Testing: pretend today is" in client.get("/settings").text
+    monkeypatch.delenv("BIRTHDAY_PI_TESTING")
+    assert "pretending" not in client.get("/").text
+    assert client.get("/screen/content").headers["X-Screen-Idle"] == "300"
+
+
+def test_version_line(monkeypatch):
+    from birthday_pi import main
+    monkeypatch.setattr(main, "VERSION", "v0.2.3")
+    monkeypatch.setattr(main, "BUILT", "2026-10-23")
+    assert main.version_line() == "Birthday Pi v0.2.3 · updated Oct 23"

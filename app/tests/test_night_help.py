@@ -47,7 +47,8 @@ def test_help_shows_her_hours_and_who_to_call(set_up):
 def test_every_phone_page_links_to_help(set_up):
     assert 'href="/help"' in set_up.get("/").text
     assert 'href="/help"' in set_up.get("/people").text
-    assert 'href="/settings/night"' in set_up.get("/").text  # Grandma's way in
+    assert 'href="/settings"' in set_up.get("/").text  # her way in: Settings, then Screen at night
+    assert 'href="/settings/night"' in set_up.get("/settings").text
 
 
 def test_phone_pages_give_the_home_screen_an_icon_and_name(set_up):
