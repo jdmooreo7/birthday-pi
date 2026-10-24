@@ -114,6 +114,8 @@ def page(request: Request, name: str, status_code: int = 200, **context) -> HTML
             # Whoever it's for, by the name the family gave at setup (no "Grandma" default).
             owner = db.owner(conn)
             context.setdefault("owner_name", owner["name"] if owner else "")
+            # Her Settings link follows her round every page, not just home.
+            context.setdefault("trusted_owner", devices.is_trusted_owner(context.get("device")))
         finally:
             conn.close()
     return templates.TemplateResponse(request, name, context, status_code=status_code)

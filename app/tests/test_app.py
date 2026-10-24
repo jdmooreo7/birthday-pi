@@ -264,9 +264,13 @@ def test_settings_under_her_name(set_up):
     assert client.get("/screen/content").headers["X-Screen-Idle"] == "900"
     r = client.post("/settings/helper", data={"name": "Sam", "phone": "555 0142", "back": "/settings"}, follow_redirects=False)
     assert r.headers["location"] == "/settings" and "Sam · on the Help page" in client.get("/settings").text
+    for path in ("/people", "/photos", "/help"):  # it follows her round, not just home
+        assert 'href="/settings">Settings' in client.get(path).text, path
+    assert 'href="/settings">Settings' not in page  # not on Settings itself
     client.cookies.clear()
     client.post("/who", data={"new_name": "Dana"})
     assert 'href="/settings">Settings' not in client.get("/").text
+    assert 'href="/settings">Settings' not in client.get("/people").text
     assert client.get("/settings", follow_redirects=False).headers["location"] == "/pin"
     assert "Birthday Pi (unknown build)" in client.get("/help").text  # any phone sees the version on Help
 
