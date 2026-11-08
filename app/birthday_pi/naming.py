@@ -6,8 +6,13 @@ Undo just unlinks. A face taken out of a group ("isn't them") is left without a 
 worker places it elsewhere, never back in that group.
 """
 import sqlite3
+from datetime import date
+
+from . import PRODUCT, db
 
 OFFERED_AT = 3
+MAYBE_AT = 2  # v0.2.4: groups in exactly this many photos show quietly under "Seen in 2 photos"
+SEEN = "faces_seen"  # the newest face id when she last opened "Who's in your photos?"; newer ones are "New"
 IGNORE_REASONS = {"not_family": "Not family", "not_person": "Not a person"}
 
 # Approved photos only: faces in photos waiting for Grandma aren't offered until she approves them.
@@ -26,10 +31,130 @@ def group(conn: sqlite3.Connection, group_id: int) -> sqlite3.Row | None:
     return conn.execute(_GROUPS.format(where="WHERE g.id = ?"), (group_id,)).fetchone()
 
 
-def to_name(conn: sqlite3.Connection) -> list[sqlite3.Row]:
-    """Groups still to ask about, biggest first."""
+def _unnamed(conn: sqlite3.Connection, keep) -> list[sqlite3.Row]:
+    """Unnamed groups whose photo count passes keep(), new ones first, then biggest first."""
     rows = conn.execute(_GROUPS.format(where="WHERE g.person_id IS NULL AND g.ignored IS NULL")).fetchall()
-    return [r for r in rows if r["photos"] >= OFFERED_AT]
+    new = new_groups(conn)
+    return sorted((r for r in rows if keep(r["photos"])), key=lambda r: (r["id"] not in new, -r["photos"], r["id"]))
+
+
+def to_name(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    """Groups still to ask about: new ones first, then biggest first."""
+    return _unnamed(conn, lambda n: n >= OFFERED_AT)
+
+
+def maybe(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    """Groups seen in only 2 photos, for the quiet "Seen in 2 photos" section. One-photo faces aren't shown."""
+    return _unnamed(conn, lambda n: n == MAYBE_AT)
+
+
+# ---------- v0.2.4: what's new since she last looked, and her home card ----------
+
+def seen_face(conn: sqlite3.Connection) -> int:
+    """The newest face id she has seen. The first time it's asked, everything found so far counts as seen,
+    so an update doesn't mark every old group New."""
+    value = db.get_setting(conn, SEEN)
+    if value is None:
+        mark_seen(conn)
+        value = db.get_setting(conn, SEEN)
+    return int(value)
+
+
+def mark_seen(conn: sqlite3.Connection) -> None:
+    """She opened "Who's in your photos?": every New tag clears."""
+    db.set_setting(conn, SEEN, str(conn.execute("SELECT COALESCE(MAX(id), 0) FROM faces").fetchone()[0]))
+
+
+def new_groups(conn: sqlite3.Connection) -> set[int]:
+    """Unnamed groups that appeared or grew since she last looked."""
+    return {r[0] for r in conn.execute(
+        "SELECT DISTINCT f.group_id FROM faces f JOIN face_groups g ON g.id = f.group_id "
+        "JOIN photos ph ON ph.id = f.photo_id AND ph.status = 'approved' "
+        "WHERE g.person_id IS NULL AND g.ignored IS NULL AND f.id > ?", (seen_face(conn),))}
+
+
+def _day(iso: str) -> str:
+    d = date.fromisoformat(iso)
+    return f"{d.strftime('%b')} {d.day}"
+
+
+def _new_days(conn: sqlite3.Connection, group_ids: list[int]) -> list[str]:
+    """The days the new photos in these groups were added (local time), oldest first."""
+    if not group_ids:
+        return []
+    marks = ",".join("?" * len(group_ids))
+    return [r[0] for r in conn.execute(
+        "SELECT DISTINCT date(ph.created_at, 'localtime') AS d FROM faces f "
+        "JOIN photos ph ON ph.id = f.photo_id AND ph.status = 'approved' "
+        f"WHERE f.group_id IN ({marks}) AND f.id > ? ORDER BY d", (*group_ids, seen_face(conn)))]
+
+
+def notes(conn: sqlite3.Connection, rows: list[sqlite3.Row]) -> dict[int, str]:
+    """The small line under each group: "In 5 photos, 1 from Nov 4", "From Nov 4", "Since Oct 15"."""
+    seen, out = seen_face(conn), {}
+    for g in rows:
+        r = conn.execute(
+            "SELECT COUNT(DISTINCT CASE WHEN f.id > ? THEN f.photo_id END),"
+            " MIN(date(ph.created_at, 'localtime')) FROM faces f "
+            "JOIN photos ph ON ph.id = f.photo_id AND ph.status = 'approved' WHERE f.group_id = ?",
+            (seen, g["id"])).fetchone()
+        days = _new_days(conn, [g["id"]])
+        when = f"from {_day(days[0])}" if len(days) == 1 else "new"
+        if g["photos"] >= OFFERED_AT:
+            out[g["id"]] = f"In {g['photos']} photos" + (f", {r[0]} {when}" if r[0] else "")
+        elif r[0]:
+            out[g["id"]] = f"From {_day(days[0])}" if len(days) == 1 else "From new photos"
+        else:
+            out[g["id"]] = f"Since {_day(r[1])}" if r[1] else ""
+    return out
+
+
+def _count(n: int, one: str, many: str | None = None) -> str:
+    return f"{n} {one if n == 1 else many or one + 's'}"
+
+
+def home_card(conn: sqlite3.Connection) -> dict:
+    """Her home page's one "Who's in your photos" card (her trusted phone only): a few faces and two lines,
+    in the first state that fits: looking at new photos, new people found, things to do, all caught up."""
+    todo, maybes, checks = to_name(conn), maybe(conn), asking(conn)
+    new = new_groups(conn)
+    fresh = [g for g in todo + maybes if g["id"] in new]
+    named = conn.execute(
+        "SELECT COUNT(DISTINCT g.person_id) FROM face_groups g JOIN faces f ON f.group_id = g.id "
+        "JOIN photos ph ON ph.id = f.photo_id AND ph.status = 'approved' WHERE g.person_id IS NOT NULL").fetchone()[0]
+    looking = conn.execute("SELECT COUNT(*) FROM photos WHERE status = 'approved' AND faces_scanned = 0").fetchone()[0]
+    to_do = [s for s in (checks and _count(len(checks), "face") + " to check", todo and f"{len(todo)} to name") if s]
+    named_line = _count(named, "person", "people") + " named"
+    maybe_line = f"{len(maybes)} maybe, seen in {MAYBE_AT} photos"
+    hot = False
+    if looking:
+        line1 = f"Looking for faces in {_count(looking, 'new photo')}…"
+        line2 = (f"{named_line} · usually" if named else "Usually") + " a minute or two"
+    elif fresh:
+        days = _new_days(conn, [g["id"] for g in fresh])
+        line1 = f"{_count(len(fresh), 'person', 'people')} " + (
+            f"from {_day(days[0])}'s photos" if len(days) == 1 else "from new photos")
+        line2, hot = " · ".join(to_do) or maybe_line, True
+    elif checks:
+        line1 = to_do[0]
+        line2, hot = (to_do[1] if len(to_do) > 1 else f"Is this who {PRODUCT} thinks it is?"), True
+    elif todo:
+        line1, line2, hot = _count(len(todo), "person", "people") + " to name", "Name them so their photos show on their day.", True
+    elif conn.execute("SELECT 1 FROM faces LIMIT 1").fetchone():
+        line1 = named_line if named else "No one named yet"
+        line2 = maybe_line if maybes else "Nothing new to name"
+    else:
+        line1, line2 = "No faces found yet", f"Add photos and {PRODUCT} will find the faces in them."
+    if fresh or todo:
+        strip = face_ids(conn, (fresh or todo)[0]["id"], limit=3)
+    elif checks:
+        strip = [c["id"] for c in checks[:3]]
+    else:  # someone's clearest face for each of the first few people named
+        strip = [r[0] for r in conn.execute(
+            "SELECT f.id, MAX(f.score) FROM faces f JOIN face_groups g ON g.id = f.group_id "
+            "JOIN photos ph ON ph.id = f.photo_id AND ph.status = 'approved' "
+            "WHERE g.person_id IS NOT NULL GROUP BY g.person_id ORDER BY g.person_id LIMIT 3")]
+    return {"line1": line1, "line2": line2, "hot": hot, "new": bool(fresh) and not looking, "strip": strip}
 
 
 def next_after(conn: sqlite3.Connection, group_id: int | None) -> int | None:

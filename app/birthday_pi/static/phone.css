@@ -140,6 +140,28 @@ input:focus, select:focus, .btn:focus-visible, .choice:focus-visible, a:focus-vi
 .ask-photo .ring { position: absolute; border: 3px solid var(--accent); border-radius: 50%; box-sizing: border-box; }
 .new-badge { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--accent); color: #fff;
   font-size: 13px; font-weight: 700; line-height: 1.5; }
+/* v0.2.4: her "Who's in your photos" card, the faces-to-check banner, New first, and "Seen in 2 photos". */
+.faces-card { display: flex; align-items: center; gap: 12px; padding: 14px; background: var(--card); border: 2px solid var(--line);
+  border-radius: 18px; color: var(--ink); font-weight: 400; text-decoration: none; }
+.faces-card.hot { border-color: var(--accent); }
+.faces-card:hover { color: var(--ink); border-color: var(--accent); }
+.faces-card .face-strip img { width: 48px; height: 48px; margin-right: -12px; }
+.faces-card .grow { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; padding-left: 12px; }
+.faces-card svg { flex-shrink: 0; color: var(--accent); }
+.check-banner { display: flex; align-items: center; gap: 12px; min-height: 72px; padding: 12px 14px; border-radius: 16px;
+  background: var(--warm); color: var(--ink); font-weight: 400; text-decoration: none; }
+.check-banner:hover { color: var(--ink); }
+.check-banner .grow { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.check-banner .pill { display: flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 999px;
+  background: var(--ink); color: #fff; font-weight: 700; }
+.group-row.new { border-color: var(--accent); }
+.maybe { display: flex; flex-direction: column; gap: 8px; padding: 14px; border: 2px dashed var(--line); border-radius: 16px; }
+.maybe h2 { font-size: 19px; }
+.maybe-row { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 6px 4px; border-top: 1px solid var(--line);
+  color: var(--ink); font-weight: 400; text-decoration: none; }
+.maybe-row .face-strip img { width: 38px; height: 38px; margin-right: -8px; border-color: var(--bg); }
+.maybe-row .grow { flex: 1; font-size: 16px; padding-left: 8px; }
+.maybe-row .go { color: var(--accent); font-weight: 700; padding: 0 4px; }
 .new-badge.on-tile { position: absolute; left: 4px; bottom: 4px; font-size: 11px; padding: 0 6px; }
 
 /* Help page, footer and "Screen at night" (M8). */

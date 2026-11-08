@@ -135,3 +135,89 @@ def test_health_check_follows_the_heartbeat(conn):
     from datetime import datetime
     db.set_setting(conn, faces.HEARTBEAT, datetime.now().isoformat(timespec="seconds"))
     assert faces.healthy()
+
+
+# ---------- v0.2.4: tidying the unnamed groups after new photos ----------
+
+def _at(degrees):
+    """A face embedding at this angle: 0° and 70° are different people (cosine 0.34), 30° is between."""
+    import math
+    return _unit(math.cos(math.radians(degrees)), math.sin(math.radians(degrees)))
+
+
+def _face(conn, photo_id, group_id, feature, confirmed=0, not_group=None):
+    if not conn.execute("SELECT 1 FROM photos WHERE id = ?", (photo_id,)).fetchone():
+        _photo(conn, photo_id)
+        conn.execute("UPDATE photos SET faces_scanned = 1 WHERE id = ?", (photo_id,))
+    if not conn.execute("SELECT 1 FROM face_groups WHERE id = ?", (group_id,)).fetchone():
+        conn.execute("INSERT INTO face_groups (id) VALUES (?)", (group_id,))
+    return conn.execute(
+        "INSERT INTO faces (photo_id, group_id, x, y, w, h, score, embedding, confirmed, not_group) "
+        "VALUES (?, ?, 0, 0, 60, 60, 0.9, ?, ?, ?)", (photo_id, group_id, faces.to_blob(feature), confirmed, not_group)
+    ).lastrowid
+
+
+def _groups(conn):
+    return [sorted(r[0] for r in conn.execute("SELECT photo_id FROM faces WHERE group_id = ?", (g,)))
+            for (g,) in conn.execute("SELECT DISTINCT group_id FROM faces WHERE group_id IS NOT NULL ORDER BY group_id")]
+
+
+def test_a_new_photo_can_show_two_groups_are_one_person(conn):
+    finder = FakeFinder({"a" * 16: [_at(0)], "b" * 16: [_at(70)], "c" * 16: [_at(30)]})
+    for pid in ("a" * 16, "b" * 16):
+        _photo(conn, pid)
+    faces.scan_waiting(conn, finder)
+    assert len(_groups(conn)) == 2  # too different to be one person, so far
+    _photo(conn, "c" * 16)
+    faces.scan_waiting(conn, finder)
+    assert _groups(conn) == [["a" * 16, "b" * 16, "c" * 16]]  # c joins a, and then a and b look alike
+    assert conn.execute("SELECT COUNT(*) FROM face_groups").fetchone()[0] == 1  # the emptied group is gone
+
+
+def test_groups_with_a_photo_in_common_never_merge(conn):
+    _face(conn, "a" * 16, 1, _at(0))
+    _face(conn, "a" * 16, 2, _at(20))  # two look-alikes side by side in one photo
+    assert faces.tidy(conn) == (0, 0, 0) and len(_groups(conn)) == 2
+
+
+def test_a_face_she_took_out_never_goes_back(conn):
+    _face(conn, "a" * 16, 1, _at(0))
+    _face(conn, "b" * 16, 2, _at(10), not_group=1)  # she said this one isn't group 1's person
+    assert faces.tidy(conn) == (0, 0, 0) and len(_groups(conn)) == 2
+
+
+def test_named_and_set_aside_groups_are_never_merged(conn):
+    conn.execute("INSERT INTO people (id, name) VALUES (7, 'Mia')")
+    conn.execute("INSERT INTO face_groups (id, person_id) VALUES (1, 7)")
+    conn.execute("INSERT INTO face_groups (id, ignored) VALUES (2, 'not_family')")
+    _face(conn, "a" * 16, 1, _at(0))  # Mia
+    _face(conn, "b" * 16, 2, _at(80))
+    _face(conn, "c" * 16, 3, _at(82))  # like the set-aside group, and like each other
+    _face(conn, "d" * 16, 4, _at(78))
+    assert faces.tidy(conn) == (0, 0, 1)
+    assert _groups(conn) == [["a" * 16], ["b" * 16], ["c" * 16, "d" * 16]]
+
+
+def test_old_faces_are_named_or_asked_about_once_someone_is_named(conn):
+    conn.execute("INSERT INTO people (id, name) VALUES (7, 'Mia')")
+    conn.execute("INSERT INTO face_groups (id, person_id) VALUES (1, 7)")
+    for i in range(3):
+        _face(conn, f"{i:016x}", 1, _at(i), confirmed=1)
+    clear = _face(conn, "a" * 16, 2, _at(5))  # clearly Mia
+    unsure = _face(conn, "b" * 16, 3, _at(64))  # cosine 0.46: maybe Mia
+    corrected = _face(conn, "c" * 16, 4, _at(5), not_group=9)  # she has corrected this face before: left alone
+    twice = _face(conn, f"{0:016x}", 5, _at(6))  # Mia is already in this photo
+    stranger = _face(conn, "d" * 16, 6, _at(90))
+    assert faces.tidy(conn) == (1, 1, 1)
+    rows = {r[0]: (r[1], r[2]) for r in conn.execute("SELECT id, group_id, ask_group FROM faces")}
+    assert rows[clear] == (1, None) and rows[unsure] == (None, 1) and rows[stranger] == (6, None)
+    assert rows[corrected] == rows[twice] == (4, None)  # not Mia, but alike: they merge, still unnamed
+    assert faces.tidy(conn) == (0, 0, 0)  # nothing more to do the second time
+
+
+def test_the_worker_tidies_once_when_it_starts(conn):
+    _face(conn, "a" * 16, 1, _at(0))
+    _face(conn, "b" * 16, 2, _at(10))
+    assert faces.scan_waiting(conn, FakeFinder({})) == (0, 0) and len(_groups(conn)) == 2  # nothing new: no tidy
+    faces.scan_waiting(conn, FakeFinder({}), tidy_anyway=True)
+    assert len(_groups(conn)) == 1

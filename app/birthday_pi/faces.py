@@ -67,7 +67,7 @@ class Groups:
             "WHERE g.person_id IS NOT NULL AND f.confirmed = 1 GROUP BY g.person_id")}
 
     def nearest(self, feature: np.ndarray, exclude: set[int] = frozenset(),
-                named: bool = True) -> tuple[int | None, float, float]:
+                named: bool = True, unnamed: bool = True) -> tuple[int | None, float, float]:
         """The closest group (for a named person, their biggest group), its similarity, and how far ahead
         it is of the closest other named person."""
         blocked = {self.person_of[g] for g in exclude if g in self.person_of}  # nobody twice in one photo
@@ -75,7 +75,7 @@ class Groups:
         for g, total in self.sums.items():
             person = self.person_of.get(g)
             if person is None:
-                if g not in exclude:
+                if unnamed and g not in exclude and self.sizes.get(g):
                     candidates[("group", g)] = total
             elif named and person not in blocked:
                 candidates[("person", person)] = candidates.get(("person", person), 0) + total
@@ -101,7 +101,7 @@ class Groups:
         group_id, sim, margin = self.nearest(feature, exclude, named)
         person = self.person_of.get(group_id)
         if person is not None and sim >= MATCH:
-            if sim >= AUTO and margin >= AUTO_MARGIN and self.confirmed.get(person, 0) >= AUTO_CONFIRMED:
+            if self.clear(group_id, sim, margin):
                 self._add(group_id, feature)
                 return group_id, None
             return None, group_id
@@ -113,9 +113,18 @@ class Groups:
         self._add(group_id, feature)
         return group_id, None
 
+    def clear(self, group_id: int, sim: float, margin: float) -> bool:
+        """M7's rule for naming a face without asking: a clear match to someone with 3 confirmed faces."""
+        person = self.person_of.get(group_id)
+        return sim >= AUTO and margin >= AUTO_MARGIN and self.confirmed.get(person, 0) >= AUTO_CONFIRMED
+
     def _add(self, group_id: int, feature: np.ndarray) -> None:
         self.sums[group_id] = self.sums[group_id] + feature
         self.sizes[group_id] = self.sizes.get(group_id, 0) + 1
+
+    def _remove(self, group_id: int, feature: np.ndarray) -> None:
+        self.sums[group_id] = self.sums[group_id] - feature
+        self.sizes[group_id] = self.sizes.get(group_id, 1) - 1
 
 
 class Finder:
@@ -191,12 +200,92 @@ def regroup(conn: sqlite3.Connection, groups: Groups) -> int:
     return len(loose)
 
 
-def scan_waiting(conn: sqlite3.Connection, finder: Finder) -> tuple[int, int]:
-    """Scans every photo not looked at yet, oldest first, then places any faces taken out of a group.
-    Returns (photos, faces found)."""
+def tidy(conn: sqlite3.Connection) -> tuple[int, int, int]:
+    """v0.2.4: after new photos, looks again at the unnamed groups, since the people Grandma named have
+    more faces now and new faces can show two groups are one person. Returns (named, asked, merged).
+
+    1. A face in an unnamed group that now matches someone named joins them on a clear match (M7's rule),
+       or waits for "Is this Leo?". Only faces she has never corrected: a face she took out of a group or
+       said No to stays where the worker put it, so she isn't asked about it again and again.
+    2. Unnamed groups that now look like one person merge (into the bigger one), never two faces from one
+       photo and never a face back into a group she took it out of.
+    Named and set-aside groups are never changed: her decisions stand."""
+    # The app waits (up to 30 s) while we work, so she can't name a group we're merging. The screen only reads,
+    # and WAL lets it read meanwhile. Measured on our Pi: 7 ms for 131 faces.
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        groups = Groups(conn)
+        unnamed = """FROM faces f JOIN face_groups g ON g.id = f.group_id
+                     WHERE g.person_id IS NULL AND g.ignored IS NULL"""
+        named = asked = 0
+        if groups.person_of:
+            for face in conn.execute(f"SELECT f.id, f.photo_id, f.group_id, f.embedding {unnamed} "
+                                     "AND f.not_group IS NULL ORDER BY f.id").fetchall():
+                exclude = {r[0] for r in conn.execute(
+                    "SELECT COALESCE(group_id, ask_group) FROM faces WHERE photo_id = ? AND id != ? "
+                    "AND COALESCE(group_id, ask_group) IS NOT NULL", (face["photo_id"], face["id"]))}
+                feature = from_blob(face["embedding"])
+                group_id, sim, margin = groups.nearest(feature, exclude, unnamed=False)
+                if group_id is None or sim < MATCH:
+                    continue
+                groups._remove(face["group_id"], feature)
+                if groups.clear(group_id, sim, margin):
+                    groups._add(group_id, feature)
+                    conn.execute("UPDATE faces SET group_id = ? WHERE id = ?", (group_id, face["id"]))
+                    named += 1
+                else:
+                    conn.execute("UPDATE faces SET group_id = NULL, ask_group = ? WHERE id = ?", (group_id, face["id"]))
+                    asked += 1
+
+        photos: dict[int, set[str]] = {}
+        for r in conn.execute(f"SELECT f.group_id, f.photo_id {unnamed}"):
+            photos.setdefault(r[0], set()).add(r[1])
+        apart = {(r[0], r[1]) for r in conn.execute(f"SELECT f.group_id, f.not_group {unnamed} AND f.not_group IS NOT NULL")}
+        ids = [g for g in photos if groups.sizes.get(g)]
+        merged = 0
+        while len(ids) > 1:
+            means = np.array([groups.sums[g] for g in ids])
+            means /= np.linalg.norm(means, axis=1, keepdims=True)
+            sims = np.triu(means @ means.T, 1)
+            pair = None
+            for flat in np.argsort(sims, axis=None)[::-1]:
+                i, j = divmod(int(flat), len(ids))
+                if sims[i, j] < MATCH:
+                    break
+                a, b = ids[i], ids[j]
+                if not photos[a] & photos[b] and (a, b) not in apart and (b, a) not in apart:
+                    pair = (a, b)
+                    break
+            if pair is None:
+                break
+            keep, drop = sorted(pair, key=lambda g: (-groups.sizes[g], g))
+            conn.execute("UPDATE faces SET group_id = ? WHERE group_id = ?", (keep, drop))
+            conn.execute("UPDATE faces SET not_group = ? WHERE not_group = ?", (keep, drop))
+            conn.execute("DELETE FROM face_groups WHERE id = ?", (drop,))
+            groups.sums[keep] = groups.sums[keep] + groups.sums.pop(drop)
+            groups.sizes[keep] += groups.sizes.pop(drop)
+            photos[keep] |= photos.pop(drop)
+            apart = {(keep if a == drop else a, keep if b == drop else b) for a, b in apart}
+            ids.remove(drop)
+            merged += 1
+        conn.execute("COMMIT")
+    except BaseException:
+        conn.execute("ROLLBACK")
+        raise
+    if named or asked or merged:
+        log.info("tidied the unnamed groups: %d faces named, %d to check, %d groups merged", named, asked, merged)
+    return named, asked, merged
+
+
+def scan_waiting(conn: sqlite3.Connection, finder: Finder, tidy_anyway: bool = False) -> tuple[int, int]:
+    """Scans every photo not looked at yet, oldest first, then places any faces taken out of a group,
+    then tidies the unnamed groups. tidy_anyway: tidy even with nothing new (the worker does this once at
+    start, so an update tidies what's already there). Returns (photos, faces found)."""
     todo = [r["id"] for r in conn.execute("SELECT id FROM photos WHERE faces_scanned = 0 ORDER BY created_at, id")]
     loose = conn.execute("SELECT 1 FROM faces WHERE group_id IS NULL AND ask_group IS NULL LIMIT 1").fetchone()
     if not todo and not loose:
+        if tidy_anyway:
+            tidy(conn)
         return 0, 0
     groups = Groups(conn)  # reloaded each round, since Grandma can take faces out of groups in the app
     faces = 0
@@ -204,6 +293,7 @@ def scan_waiting(conn: sqlite3.Connection, finder: Finder) -> tuple[int, int]:
         faces += scan(conn, finder, photo_id, groups)
         db.set_setting(conn, HEARTBEAT, datetime.now().isoformat(timespec="seconds"))
     regroup(conn, groups)
+    tidy(conn)
     return len(todo), faces
 
 
@@ -222,11 +312,13 @@ def main() -> None:
     os.nice(10)  # the monitor and the app come first
     finder = Finder()
     log.info("faces worker started")
+    first = True
     while True:
         conn = db.connect()
         try:
             started = time.monotonic()
-            photos, faces = scan_waiting(conn, finder)
+            photos, faces = scan_waiting(conn, finder, tidy_anyway=first)
+            first = False
             if photos:
                 log.info("scanned %d photos, found %d faces in %.1fs", photos, faces, time.monotonic() - started)
             db.set_setting(conn, HEARTBEAT, datetime.now().isoformat(timespec="seconds"))

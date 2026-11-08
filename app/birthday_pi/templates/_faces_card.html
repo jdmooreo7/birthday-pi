@@ -1,0 +1,10 @@
+{# v0.2.4: her one "Who's in your photos" card (trusted phone only), in place of "faces to check" and "people to name". #}
+<a class="faces-card{% if faces_card.hot %} hot{% endif %}" href="/faces">
+  {% if faces_card.strip %}<span class="face-strip">{% for f in faces_card.strip %}<img src="/face-files/{{ f }}.jpg" alt="">{% endfor %}</span>{% endif %}
+  <span class="grow">
+    <span class="name">Who's in your photos</span>
+    <span>{% if faces_card.new %}<span class="new-badge">New</span> {% endif %}{{ faces_card.line1 }}</span>
+    <span class="muted small">{{ faces_card.line2 }}</span>
+  </span>
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+</a>
