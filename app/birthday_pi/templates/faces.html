@@ -12,6 +12,12 @@
 </div>
 {% if undo %}<form id="undo" method="post" action="/faces/{{ undo.group.id }}/unignore"></form>{% endif %}
 {% include "_undo_strip.html" %}
+{% if to_check %}
+<a class="check-banner" href="/faces/ask">
+  <span class="grow"><span class="name">{{ to_check }} face{{ "" if to_check == 1 else "s" }} to check</span><span class="small">Is this who {{ product }} thinks it is?</span></span>
+  <span class="pill">Check</span>
+</a>
+{% endif %}
 {% if not running %}<div class="notice">The face finder isn't running, so new photos aren't being looked at. On the Pi, run <code>docker compose up -d</code>.</div>{% endif %}
 {% if offered %}
 <div class="progress" role="group" aria-label="Naming progress">
@@ -24,14 +30,27 @@
   <h2 id="todo-h">To name</h2>
   <div class="groups">
     {% for g in shown %}
-    <a class="group-row" href="/faces/{{ g.id }}">
+    <a class="group-row{% if g.id in new %} new{% endif %}" href="/faces/{{ g.id }}">
       <span class="face-strip">{% for f in strips[g.id] %}<img src="/face-files/{{ f }}.jpg" alt="">{% endfor %}</span>
-      <span class="grow"><span class="name">Not named yet</span><span class="muted small">In {{ g.photos }} photos</span></span>
+      <span class="grow"><span class="name">Not named yet</span><span class="muted small">{% if g.id in new %}<span class="new-badge">New</span> {% endif %}{{ notes[g.id] }}</span></span>
       <span class="go">Name</span>
     </a>
     {% endfor %}
   </div>
   {% if todo | length > shown | length %}<a class="btn quiet" href="/faces?all=1">Show {{ todo | length - shown | length }} more</a>{% endif %}
+</section>
+{% endif %}
+{% if maybes %}
+<section class="maybe" aria-labelledby="maybe-h">
+  <h2 id="maybe-h">Seen in {{ maybe_at }} photos <span class="muted" style="font-weight: 400">· {{ maybes | length }}</span></h2>
+  <p class="muted small">Maybe someone you know. Name them now, or wait: they move up when they're in a third photo.</p>
+  {% for g in maybes %}
+  <a class="maybe-row" href="/faces/{{ g.id }}">
+    <span class="face-strip">{% for f in strips[g.id] %}<img src="/face-files/{{ f }}.jpg" alt="">{% endfor %}</span>
+    <span class="grow">{% if g.id in new %}<span class="new-badge">New</span> {% endif %}<span class="muted">{{ notes[g.id] }}</span></span>
+    <span class="go">Name</span>
+  </a>
+  {% endfor %}
 </section>
 {% endif %}
 {% if named %}
@@ -45,6 +64,6 @@
 {% if set_aside %}
 <a class="set-aside-link" href="/faces/set-aside"><span><b>Set aside</b> <span class="muted">· {{ set_aside }} {{ "group" if set_aside == 1 else "groups" }}</span></span><span class="go">See them</span></a>
 {% endif %}
-<p class="muted small">People in fewer than {{ offered_at }} photos aren't asked about. You can still tag anyone on a photo. Looked at {{ counts.scanned }} of {{ counts.photos }} photos so far.</p>
+<p class="muted small">{{ product }} tidies these groups each time new photos come in. People in only one photo aren't shown. You can still tag anyone on a photo. Looked at {{ counts.scanned }} of {{ counts.photos }} photos so far.</p>
 <a class="btn quiet" href="/">Home</a>
 {% endblock %}

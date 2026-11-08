@@ -232,8 +232,7 @@ def home(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
         upcoming=upcoming(conn, now, within_days=COMING_UP_DAYS), missing=missing_birthdays(conn),
         people_count=people_count, trusted_owner=devices.is_trusted_owner(device),
         pending=photos.pending_count(conn),
-        to_name=len(naming.to_name(conn)) if devices.is_trusted_owner(device) else 0,
-        to_check=len(naming.asking(conn)) if devices.is_trusted_owner(device) else 0,
+        faces_card=naming.home_card(conn) if devices.is_trusted_owner(device) else None,
         my_pending=conn.execute("SELECT COUNT(*) FROM photos WHERE status = 'pending' AND uploader_id = ?",
                                 (device["person_id"],)).fetchone()[0],
     )
@@ -838,12 +837,16 @@ def _get_group(conn: sqlite3.Connection, group_id: int) -> sqlite3.Row:
 
 @app.get("/faces")
 def faces_list(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
-    """Who's in your photos? Groups still to name, biggest first, then the people already named."""
+    """Who's in your photos? Faces to check, groups still to name (new ones first), the quieter groups seen in
+    2 photos, then the people already named. Opening it clears the New tags."""
     device = require_trusted_owner(conn, request)
     todo = naming.to_name(conn)
     show_all = request.query_params.get("all") == "1"
     shown = todo if show_all else todo[:TO_NAME_SHOWN]
+    maybes = naming.maybe(conn)
     strips = {g["id"]: naming.face_ids(conn, g["id"], limit=3) for g in shown}
+    strips.update({g["id"]: naming.face_ids(conn, g["id"], limit=2) for g in maybes})
+    new, notes = naming.new_groups(conn), naming.notes(conn, shown + maybes)
     named = naming.named_people(conn)
     named_groups = conn.execute(
         "SELECT COUNT(*) FROM (SELECT g.id FROM face_groups g JOIN faces f ON f.group_id = g.id "
@@ -853,9 +856,12 @@ def faces_list(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
         "SELECT COUNT(*) AS photos, COALESCE(SUM(faces_scanned), 0) AS scanned FROM photos").fetchone()
     beat = db.get_setting(conn, "faces_heartbeat")
     running = bool(beat) and (datetime.now() - datetime.fromisoformat(beat)).total_seconds() < FACE_WORKER_LATE
+    to_check = len(naming.asking(conn))
+    naming.mark_seen(conn)
     return page(request, "faces.html", device=device, todo=todo, shown=shown, strips=strips, named=named,
                 named_groups=named_groups, counts=counts, running=running, offered_at=naming.OFFERED_AT,
-                set_aside=len(naming.set_aside(conn)), undo=_undo_strip(conn, request))
+                set_aside=len(naming.set_aside(conn)), undo=_undo_strip(conn, request),
+                maybes=maybes, maybe_at=naming.MAYBE_AT, new=new, notes=notes, to_check=to_check)
 
 
 def _undo_strip(conn: sqlite3.Connection, request: Request) -> dict | None:

@@ -36,7 +36,7 @@ def test_naming_flow_new_person_then_birthday(set_up):
     _family_photos(conn)
     mia = _group_of(conn, 0)
     home = client.get("/").text
-    assert "2 people to name in your photos" in home
+    assert "Who's in your photos" in home and "2 to name" in home
     listing = client.get("/faces").text
     assert listing.index(f'href="/faces/{mia}"') < listing.index("In 3 photos")  # biggest first
     group_page = client.get(f"/faces/{mia}").text
@@ -163,7 +163,7 @@ def test_naming_is_grandma_only(set_up):
     mia = _group_of(conn, 0)
     client.cookies.clear()
     client.post("/who", data={"new_name": "Dana"})
-    assert "to name in your photos" not in client.get("/").text
+    assert "Who's in your photos" not in client.get("/").text
     for url in ("/faces", f"/faces/{mia}", f"/faces/{mia}/who", f"/faces/{mia}/named"):
         assert client.get(url, follow_redirects=False).headers["location"] == "/pin"
     assert client.post(f"/faces/{mia}/who", data={"new_name": "Mallory"}, follow_redirects=False).headers["location"] == "/pin"
@@ -369,3 +369,60 @@ def test_checking_faces_is_grandma_only(set_up):
     for url, data in ((f"/faces/ask/{face}", {"action": "yes"}), (f"/people/{person}/faces", {"out": str(face)})):
         assert client.post(url, data=data, follow_redirects=False).headers["location"] == "/pin"
     assert naming.ask(conn, face) is not None
+
+
+# ---------- v0.2.4: one home card, New first, "Seen in 2 photos" ----------
+
+def _today(conn):
+    d = date.fromisoformat(conn.execute("SELECT date('now', 'localtime')").fetchone()[0])
+    return f"{d:%b} {d.day}"
+
+
+def test_home_card_follows_new_photos(set_up):
+    client, conn = set_up, db.connect()
+    assert "No faces found yet" in client.get("/").text  # the card is always there on her phone
+    _family_photos(conn)
+    home = client.get("/").text  # found since she first opened the app, so New
+    assert "Who's in your photos" in home and "2 people from " + _today(conn) + "&#39;s photos" in home
+    client.get("/faces")  # she looks: nothing is new now
+    home = client.get("/").text
+    assert "new-badge" not in home and "2 people to name" in home
+    _photo(conn, "f" * 16)
+    assert "Looking for faces in 1 new photo" in client.get("/").text
+    sam = _unit(0, 0, 1)
+    found = {pid: [sam] for pid in ("e" * 16, "f" * 16, "9" * 16)}
+    for pid in ("e" * 16, "9" * 16):
+        _photo(conn, pid)
+    faces.scan_waiting(conn, FakeFinder(found))
+    home = client.get("/").text
+    assert 'class="new-badge">New</span> 1 person from ' + _today(conn) + "&#39;s photos" in home
+    assert "3 to name" in home and 'class="faces-card hot"' in home
+    listing = client.get("/faces").text
+    sam_group = conn.execute("SELECT group_id FROM faces WHERE photo_id = ?", ("e" * 16,)).fetchone()[0]
+    assert listing.index(f'href="/faces/{sam_group}"') < listing.index('href="/faces/', listing.index("To name") + 1) + 1
+    assert "In 3 photos, 3 from " + _today(conn) in listing and 'group-row new' in listing
+    assert "new-badge" not in client.get("/").text  # opening the page cleared the New tags
+    assert "new-badge" not in client.get("/faces").text
+
+
+def test_groups_in_two_photos_show_quietly(set_up):
+    client, conn = set_up, db.connect()
+    _family_photos(conn, n_mia=2, n_leo=1)
+    page = client.get("/faces").text
+    mia = _group_of(conn, 0)
+    assert "Seen in 2 photos" in page and f'class="maybe-row" href="/faces/{mia}"' in page
+    assert "From " + _today(conn) in page and "To name" not in page
+    assert "Since " + _today(conn) in client.get("/faces").text  # not new the second time
+    assert f'href="/faces/{_group_of(conn, 1)}"' not in page  # one-photo faces aren't shown
+    assert "1 maybe, seen in 2 photos" in client.get("/").text
+    client.post(f"/faces/{mia}/who", data={"new_name": "Mia"})
+    assert naming.group(conn, mia)["person_id"] is not None
+    assert "Seen in 2 photos" not in client.get("/faces").text
+
+
+def test_faces_page_links_to_checking(set_up):
+    client, conn = set_up, db.connect()
+    _named(client, conn)
+    _import(conn, "a" * 16, _unit(1, 0.1, 2))  # unsure: like Mia
+    page = client.get("/faces").text
+    assert 'class="check-banner" href="/faces/ask"' in page and "1 face to check" in page
